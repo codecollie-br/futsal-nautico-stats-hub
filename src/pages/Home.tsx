@@ -26,7 +26,7 @@ const Home = () => {
   };
   return <div className="space-y-6">
       {/* Hero Section */}
-      <div className="text-center py-8 bg-gradient-to-r from-orange-600 to-orange-800 text-white rounded-lg">
+      <div className="text-center py-8 bg-gradient-to-r from-orange-600 to-orange-600 text-white rounded-lg">
         <h1 className="text-4xl font-bold mb-2">Futsal do Náutico</h1>
         <p className="text-xl opacity-90">Acompanhe todas as partidas dos domingos</p>
       </div>
