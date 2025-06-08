@@ -1,16 +1,54 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Settings, Users, Database, BarChart3 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useCreateDomingo, useDomingos } from "@/hooks/useNautico";
+import { useState } from "react";
+import { Input } from "@/components/ui/input";
+import { toast } from "@/components/ui/use-toast";
 
 const Admin = () => {
+  const { data: domingos } = useDomingos();
+  const createDomingo = useCreateDomingo();
+  const [dataDomingo, setDataDomingo] = useState("");
+  const [tokenCriado, setTokenCriado] = useState<string | null>(null);
+
+  const handleCriarDomingo = async () => {
+    if (!dataDomingo) return;
+    try {
+      const domingo = await createDomingo.mutateAsync(dataDomingo);
+      setTokenCriado(domingo.token_moderacao);
+      toast({ title: "Domingo criado!", description: "Token de moderação gerado." });
+    } catch (err: any) {
+      toast({ title: "Erro", description: err.message || "Erro ao criar domingo", variant: "destructive" });
+    }
+  };
+
+  const handleCopyToken = () => {
+    if (tokenCriado) {
+      navigator.clipboard.writeText(tokenCriado);
+      toast({ title: "Token copiado!", description: tokenCriado });
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="text-center">
         <h1 className="text-3xl font-bold mb-2">Painel Administrativo</h1>
         <p className="text-gray-600">Gerencie a aplicação e seus dados</p>
+        <div className="flex flex-col items-center gap-2 mt-4">
+          <Input type="date" value={dataDomingo} onChange={e => setDataDomingo(e.target.value)} />
+          <Button onClick={handleCriarDomingo} disabled={createDomingo.isPending || !dataDomingo}>
+            {createDomingo.isPending ? 'Criando...' : 'Criar Domingo'}
+          </Button>
+          {tokenCriado && (
+            <div className="mt-2">
+              <span className="font-mono bg-gray-100 px-2 py-1 rounded">{tokenCriado}</span>
+              <Button size="sm" className="ml-2" onClick={handleCopyToken}>Copiar Token</Button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Cards de Funcionalidades */}

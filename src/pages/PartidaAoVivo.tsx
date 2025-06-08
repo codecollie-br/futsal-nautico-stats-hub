@@ -1,12 +1,15 @@
-
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { usePartidaAtual, useCreateDomingo, useCreatePartida, useIniciarPartida, useFinalizarPartida } from "@/hooks/useNautico";
+import { usePartidaAtual, useCreateDomingo, useCreatePartida, useIniciarPartida, useFinalizarPartida, useRegistrarEvento } from "@/hooks/useNautico";
 import { useToast } from "@/hooks/use-toast";
 import Cronometro from "@/components/partida/Cronometro";
 import PlacarPartida from "@/components/partida/PlacarPartida";
 import { Plus, Play } from "lucide-react";
+import { useLocation } from "react-router-dom";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const PartidaAoVivo = () => {
   const { data: partidaAtual, refetch } = usePartidaAtual();
@@ -14,10 +17,18 @@ const PartidaAoVivo = () => {
   const createPartida = useCreatePartida();
   const iniciarPartida = useIniciarPartida();
   const finalizarPartida = useFinalizarPartida();
+  const registrarEvento = useRegistrarEvento();
   const { toast } = useToast();
+  const location = useLocation();
+  const [isModerador, setIsModerador] = useState(false);
 
   const [tempoAtual, setTempoAtual] = useState(0);
   const [cronometroRodando, setCronometroRodando] = useState(false);
+  const [modalGolOpen, setModalGolOpen] = useState<false | 'LARANJA' | 'PRETO'>(false);
+  const [marcadorId, setMarcadorId] = useState<number | null>(null);
+  const [assistenteId, setAssistenteId] = useState<number | null>(null);
+  const [golContra, setGolContra] = useState(false);
+  const [erroGol, setErroGol] = useState<string | null>(null);
 
   const handleTempoChange = useCallback((segundos: number) => {
     setTempoAtual(segundos);
@@ -107,12 +118,59 @@ const PartidaAoVivo = () => {
     }
   };
 
+  const jogadoresLaranja = partidaAtual?.jogadores_por_partida?.filter(jp => jp.time === 'LARANJA').map(jp => jp.jogador).filter(Boolean) || [];
+  const jogadoresPreto = partidaAtual?.jogadores_por_partida?.filter(jp => jp.time === 'PRETO').map(jp => jp.jogador).filter(Boolean) || [];
+
+  const abrirModalGol = (time: 'LARANJA' | 'PRETO') => {
+    setModalGolOpen(time);
+    setMarcadorId(null);
+    setAssistenteId(null);
+    setGolContra(false);
+    setErroGol(null);
+  };
+
+  const handleRegistrarGol = async () => {
+    if (!partidaAtual || !modalGolOpen) return;
+    if (!golContra && !marcadorId) {
+      setErroGol('Selecione o marcador ou marque gol contra.');
+      return;
+    }
+    try {
+      await registrarEvento.mutateAsync({
+        partida_id: partidaAtual.id,
+        tipo_evento: 'GOL',
+        minuto_partida: Math.floor(tempoAtual / 60),
+        jogador_gol_id: golContra ? null : marcadorId,
+        jogador_assistencia_id: golContra ? null : assistenteId,
+        is_gol_contra: golContra,
+        time_marcador: modalGolOpen
+      });
+      setModalGolOpen(false);
+      toast({ title: 'Gol registrado!' });
+    } catch (err: any) {
+      setErroGol(err.message || 'Erro ao registrar gol');
+    }
+  };
+
+  useEffect(() => {
+    if (!partidaAtual?.domingo?.token_moderacao) {
+      setIsModerador(false);
+      return;
+    }
+    const params = new URLSearchParams(location.search);
+    const token = params.get("token");
+    setIsModerador(token === partidaAtual.domingo.token_moderacao);
+  }, [location.search, partidaAtual?.domingo?.token_moderacao]);
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="text-center">
         <h1 className="text-3xl font-bold mb-2">Partida Ao Vivo</h1>
         <p className="text-gray-600">Acompanhe e gerencie a partida em tempo real</p>
+        {!isModerador && (
+          <p className="text-sm text-orange-500 mt-2">Modo somente leitura. Para moderar, acesse com o token de moderação.</p>
+        )}
       </div>
 
       {!partidaAtual ? (
@@ -154,7 +212,7 @@ const PartidaAoVivo = () => {
             </CardHeader>
             <CardContent>
               <div className="flex justify-center space-x-4">
-                {partidaAtual.status === 'AGENDADA' && (
+                {partidaAtual.status === 'AGENDADA' && isModerador && (
                   <Button 
                     onClick={handleIniciarPartida}
                     disabled={iniciarPartida.isPending}
@@ -164,18 +222,16 @@ const PartidaAoVivo = () => {
                     Iniciar Partida
                   </Button>
                 )}
-                
-                {partidaAtual.status === 'EM_ANDAMENTO' && (
+                {partidaAtual.status === 'EM_ANDAMENTO' && isModerador && (
                   <Button 
                     onClick={handleFinalizarPartida}
                     disabled={finalizarPartida.isPending}
                     variant="destructive"
                     size="lg"
                   >
-                    Finalizar Partida
+                    Encerrar Partida
                   </Button>
                 )}
-                
                 {partidaAtual.status === 'FINALIZADA' && (
                   <div className="text-center">
                     <p className="text-lg font-semibold text-green-600">Partida Finalizada</p>
@@ -218,8 +274,57 @@ const PartidaAoVivo = () => {
               </div>
             </CardContent>
           </Card>
+
+          {partidaAtual && isModerador && partidaAtual.status === 'EM_ANDAMENTO' && (
+            <div className="flex justify-center gap-4 mb-4">
+              <Button style={{ background: '#ff9800', color: '#fff' }} onClick={() => abrirModalGol('LARANJA')}>
+                Marcar Gol Laranja
+              </Button>
+              <Button style={{ background: '#222', color: '#fff' }} onClick={() => abrirModalGol('PRETO')}>
+                Marcar Gol Preto
+              </Button>
+            </div>
+          )}
         </div>
       )}
+
+      <Dialog open={!!modalGolOpen} onOpenChange={setModalGolOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Registrar Gol {modalGolOpen === 'LARANJA' ? 'Laranja' : 'Preto'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Checkbox checked={golContra} onCheckedChange={setGolContra} id="gol-contra" />
+            <label htmlFor="gol-contra" className="ml-2">Gol Contra</label>
+            {!golContra && (
+              <>
+                <div>
+                  <label className="block mb-1">Marcador</label>
+                  <Select value={marcadorId?.toString() || ''} onValueChange={v => setMarcadorId(Number(v))}>
+                    <option value="">Selecione</option>
+                    {(modalGolOpen === 'LARANJA' ? jogadoresLaranja : jogadoresPreto).map(j => (
+                      <option key={j.id} value={j.id}>{j.nome}</option>
+                    ))}
+                  </Select>
+                </div>
+                <div>
+                  <label className="block mb-1">Assistente (opcional)</label>
+                  <Select value={assistenteId?.toString() || ''} onValueChange={v => setAssistenteId(Number(v))}>
+                    <option value="">Nenhum</option>
+                    {(modalGolOpen === 'LARANJA' ? jogadoresLaranja : jogadoresPreto).map(j => (
+                      <option key={j.id} value={j.id}>{j.nome}</option>
+                    ))}
+                  </Select>
+                </div>
+              </>
+            )}
+            {erroGol && <div className="text-red-600 text-sm">{erroGol}</div>}
+            <Button onClick={handleRegistrarGol} disabled={registrarEvento.isPending}>
+              {registrarEvento.isPending ? 'Registrando...' : 'Registrar Gol'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -7,11 +6,19 @@ import { Badge } from "@/components/ui/badge";
 import { useJogadores } from "@/hooks/useNautico";
 import { Search, Filter } from "lucide-react";
 import JogadorCard from "@/components/jogadores/JogadorCard";
+import JogadorForm from "@/components/jogadores/JogadorForm";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/components/ui/use-toast";
 
 const Jogadores = () => {
   const { data: jogadores, isLoading } = useJogadores();
   const [filtro, setFiltro] = useState("");
   const [filtroTipo, setFiltroTipo] = useState<'todos' | 'goleiros' | 'jogadores'>('todos');
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editJogador, setEditJogador] = useState<any>(null);
+  const queryClient = useQueryClient();
 
   const jogadoresFiltrados = jogadores?.filter(jogador => {
     const nomeMatch = jogador.nome.toLowerCase().includes(filtro.toLowerCase()) ||
@@ -30,6 +37,44 @@ const Jogadores = () => {
     jogadores: jogadores?.filter(j => !j.is_goleiro).length || 0,
   };
 
+  // Mutation para criar/editar jogador
+  const mutation = useMutation({
+    mutationFn: async (payload: any) => {
+      if (payload.id) {
+        // Editar
+        const { error } = await supabase.from('jogadores').update(payload).eq('id', payload.id);
+        if (error) throw error;
+      } else {
+        // Criar
+        const { error } = await supabase.from('jogadores').insert(payload);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      toast({ title: 'Sucesso', description: 'Jogador salvo com sucesso!' });
+      setModalOpen(false);
+      setEditJogador(null);
+      queryClient.invalidateQueries({ queryKey: ['jogadores'] });
+    },
+    onError: (err: any) => {
+      toast({ title: 'Erro', description: err.message || 'Erro ao salvar jogador', variant: 'destructive' });
+    }
+  });
+
+  const handleNovoJogador = () => {
+    setEditJogador(null);
+    setModalOpen(true);
+  };
+
+  const handleEditJogador = (jogador: any) => {
+    setEditJogador(jogador);
+    setModalOpen(true);
+  };
+
+  const handleSaveJogador = (dados: any) => {
+    mutation.mutate(dados);
+  };
+
   if (isLoading) {
     return (
       <div className="text-center py-8">
@@ -44,6 +89,7 @@ const Jogadores = () => {
       <div className="text-center">
         <h1 className="text-3xl font-bold mb-2">Jogadores</h1>
         <p className="text-gray-600">Conheça todos os craques do Náutico</p>
+        <Button className="mt-4" onClick={handleNovoJogador}>Novo Jogador</Button>
       </div>
 
       {/* Estatísticas */}
@@ -120,7 +166,17 @@ const Jogadores = () => {
       {/* Lista de Jogadores */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {jogadoresFiltrados?.map((jogador) => (
-          <JogadorCard key={jogador.id} jogador={jogador} />
+          <div key={jogador.id} className="relative group">
+            <JogadorCard jogador={jogador} />
+            <Button
+              size="sm"
+              variant="outline"
+              className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition"
+              onClick={() => handleEditJogador(jogador)}
+            >
+              Editar
+            </Button>
+          </div>
         ))}
       </div>
 
@@ -131,6 +187,16 @@ const Jogadores = () => {
           </CardContent>
         </Card>
       )}
+
+      {/* Modal de Cadastro/Edição */}
+      <Dialog open={modalOpen} onOpenChange={setModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editJogador ? 'Editar Jogador' : 'Novo Jogador'}</DialogTitle>
+          </DialogHeader>
+          <JogadorForm jogador={editJogador} onSave={handleSaveJogador} />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

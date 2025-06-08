@@ -1,4 +1,3 @@
-
 export type TimeEnum = 'LARANJA' | 'PRETO';
 export type ResultadoEnum = 'LARANJA' | 'PRETO' | 'EMPATE';
 export type TipoEvento = 'GOL' | 'SUBSTITUICAO';
@@ -22,6 +21,7 @@ export interface Domingo {
   id: number;
   data_domingo: string;
   created_at: string;
+  token_moderacao?: string;
 }
 
 export interface Partida {

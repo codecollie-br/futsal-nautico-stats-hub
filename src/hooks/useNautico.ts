@@ -1,7 +1,7 @@
-
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Jogador, Partida, Domingo, EventoPartida, JogadorPorPartida, TimeEnum, TipoEvento } from "@/types/nautico";
+import { nanoid } from 'nanoid';
 
 // Hook para buscar jogadores
 export const useJogadores = () => {
@@ -85,9 +85,10 @@ export const useCreateDomingo = () => {
   
   return useMutation({
     mutationFn: async (data_domingo: string) => {
+      const token_moderacao = nanoid(16);
       const { data, error } = await supabase
         .from('domingos')
-        .insert({ data_domingo })
+        .insert({ data_domingo, token_moderacao })
         .select()
         .single();
       
