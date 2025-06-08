@@ -1,0 +1,240 @@
+
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { Jogador, Partida, Domingo, EventoPartida, JogadorPorPartida, TimeEnum, TipoEvento } from "@/types/nautico";
+
+// Hook para buscar jogadores
+export const useJogadores = () => {
+  return useQuery({
+    queryKey: ['jogadores'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('jogadores')
+        .select('*')
+        .order('nome');
+      
+      if (error) throw error;
+      return data as Jogador[];
+    }
+  });
+};
+
+// Hook para buscar partidas com informações relacionadas
+export const usePartidas = () => {
+  return useQuery({
+    queryKey: ['partidas'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('partidas')
+        .select(`
+          *,
+          domingo:domingos(*)
+        `)
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      return data as Partida[];
+    }
+  });
+};
+
+// Hook para buscar a partida atual (em andamento)
+export const usePartidaAtual = () => {
+  return useQuery({
+    queryKey: ['partida-atual'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('partidas')
+        .select(`
+          *,
+          domingo:domingos(*),
+          jogadores_por_partida(
+            *,
+            jogador:jogadores(*)
+          ),
+          eventos_partida(*)
+        `)
+        .eq('status', 'EM_ANDAMENTO')
+        .single();
+      
+      if (error && error.code !== 'PGRST116') throw error;
+      return data as Partida | null;
+    }
+  });
+};
+
+// Hook para buscar domingos
+export const useDomingos = () => {
+  return useQuery({
+    queryKey: ['domingos'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('domingos')
+        .select('*')
+        .order('data_domingo', { ascending: false });
+      
+      if (error) throw error;
+      return data as Domingo[];
+    }
+  });
+};
+
+// Hook para criar um novo domingo
+export const useCreateDomingo = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (data_domingo: string) => {
+      const { data, error } = await supabase
+        .from('domingos')
+        .insert({ data_domingo })
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['domingos'] });
+    }
+  });
+};
+
+// Hook para criar uma nova partida
+export const useCreatePartida = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (domingo_id: number) => {
+      const { data, error } = await supabase
+        .from('partidas')
+        .insert({ domingo_id })
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['partidas'] });
+      queryClient.invalidateQueries({ queryKey: ['partida-atual'] });
+    }
+  });
+};
+
+// Hook para iniciar uma partida
+export const useIniciarPartida = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (partida_id: number) => {
+      const { data, error } = await supabase
+        .from('partidas')
+        .update({ 
+          status: 'EM_ANDAMENTO',
+          hora_inicio: new Date().toISOString()
+        })
+        .eq('id', partida_id)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['partidas'] });
+      queryClient.invalidateQueries({ queryKey: ['partida-atual'] });
+    }
+  });
+};
+
+// Hook para finalizar uma partida
+export const useFinalizarPartida = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ partida_id, duracao_minutos, vencedor }: { 
+      partida_id: number; 
+      duracao_minutos: number; 
+      vencedor: string;
+    }) => {
+      const { data, error } = await supabase
+        .from('partidas')
+        .update({ 
+          status: 'FINALIZADA',
+          hora_fim: new Date().toISOString(),
+          duracao_minutos,
+          vencedor
+        })
+        .eq('id', partida_id)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['partidas'] });
+      queryClient.invalidateQueries({ queryKey: ['partida-atual'] });
+    }
+  });
+};
+
+// Hook para adicionar jogador a uma partida
+export const useAdicionarJogadorPartida = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ partida_id, jogador_id, time }: { 
+      partida_id: number; 
+      jogador_id: number; 
+      time: TimeEnum;
+    }) => {
+      const { data, error } = await supabase
+        .from('jogadores_por_partida')
+        .insert({ partida_id, jogador_id, time })
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['partida-atual'] });
+    }
+  });
+};
+
+// Hook para registrar evento na partida
+export const useRegistrarEvento = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (evento: Partial<EventoPartida>) => {
+      const { data, error } = await supabase
+        .from('eventos_partida')
+        .insert(evento)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      
+      // Atualizar placar se for gol
+      if (evento.tipo_evento === 'GOL' && evento.time_marcador) {
+        const placarField = evento.time_marcador === 'LARANJA' ? 'time_laranja_gols' : 'time_preto_gols';
+        
+        await supabase.rpc('increment', {
+          table_name: 'partidas',
+          row_id: evento.partida_id,
+          column_name: placarField
+        });
+      }
+      
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['partida-atual'] });
+      queryClient.invalidateQueries({ queryKey: ['partidas'] });
+    }
+  });
+};
