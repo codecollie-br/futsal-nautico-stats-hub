@@ -11,6 +11,7 @@ interface JogadorFormProps {
 }
 
 const JogadorForm: React.FC<JogadorFormProps> = ({ jogador, onSave }) => {
+  console.log("JogadorForm: jogador prop recebida", jogador);
   const [nome, setNome] = useState(jogador?.nome || "");
   const [apelido, setApelido] = useState(jogador?.apelido || "");
   const [bio, setBio] = useState(jogador?.bio || "");
@@ -107,6 +108,7 @@ const JogadorForm: React.FC<JogadorFormProps> = ({ jogador, onSave }) => {
         is_goleiro: isGoleiro,
         foto_url: fotoUrl,
       };
+      console.log("JogadorForm: Payload para onSave", payload);
       await onSave(payload);
     } catch (err: any) {
       setError(err.message || "Erro ao salvar jogador");

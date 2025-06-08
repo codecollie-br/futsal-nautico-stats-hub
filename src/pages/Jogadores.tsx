@@ -67,11 +67,13 @@ const Jogadores = () => {
   };
 
   const handleEditJogador = (jogador: any) => {
+    console.log("Editando jogador:", jogador);
     setEditJogador(jogador);
     setModalOpen(true);
   };
 
   const handleSaveJogador = (dados: any) => {
+    console.log("Salvando jogador com dados:", dados);
     mutation.mutate(dados);
   };
 
