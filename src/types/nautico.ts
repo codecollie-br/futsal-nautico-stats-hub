@@ -22,6 +22,8 @@ export interface Domingo {
   data_domingo: string;
   created_at: string;
   token_moderacao?: string;
+  vitorias_laranja_consecutivas?: number;
+  vitorias_preto_consecutivas?: number;
 }
 
 export interface Partida {

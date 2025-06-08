@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { usePartidaAtual, useCreateDomingo, useCreatePartida, useIniciarPartida, useFinalizarPartida, useRegistrarEvento, useFilaEspera, useAdicionarFilaEspera, useJogadores } from "@/hooks/useNautico";
+import { usePartidaAtual, useCreateDomingo, useCreatePartida, useIniciarPartida, useFinalizarPartida, useRegistrarEvento, useFilaEspera, useAdicionarFilaEspera, useJogadores, useAdicionarJogadorPartida, useAtualizarVitoriasConsecutivas } from "@/hooks/useNautico";
 import { useToast } from "@/hooks/use-toast";
 import Cronometro from "@/components/partida/Cronometro";
 import PlacarPartida from "@/components/partida/PlacarPartida";
@@ -42,6 +42,17 @@ const PartidaAoVivo = () => {
   const jogadoresEmTimes = new Set((partidaAtual?.jogadores_por_partida || []).map(jp => jp.jogador_id));
   const jogadoresNaFila = new Set(filaEspera.map(f => f.jogador_id));
   const jogadoresDisponiveis = jogadores.filter(j => !jogadoresEmTimes.has(j.id) && !jogadoresNaFila.has(j.id));
+
+  const adicionarJogadorPartida = useAdicionarJogadorPartida();
+  const [modalTimesOpen, setModalTimesOpen] = useState(false);
+  const [timesSorteados, setTimesSorteados] = useState<{ laranja: any[]; preto: any[] }>({ laranja: [], preto: [] });
+  const [filaRestante, setFilaRestante] = useState<any[]>([]);
+  const [erroTimes, setErroTimes] = useState<string | null>(null);
+
+  const atualizarVitoriasConsecutivas = useAtualizarVitoriasConsecutivas();
+  const [modalParImpar, setModalParImpar] = useState(false);
+  const [parImparVencedor, setParImparVencedor] = useState<'LARANJA' | 'PRETO' | null>(null);
+  const [mensagemPosPartida, setMensagemPosPartida] = useState<string | null>(null);
 
   const handleTempoChange = useCallback((segundos: number) => {
     setTempoAtual(segundos);
@@ -183,6 +194,151 @@ const PartidaAoVivo = () => {
     } catch (err: any) {
       setErroAdd(err.message || 'Erro ao adicionar jogador');
     }
+  };
+
+  // Função para sortear times conforme regra
+  const sortearTimes = () => {
+    const goleiros = filaEspera.filter(f => f.jogador?.is_goleiro);
+    const linha = filaEspera.filter(f => !f.jogador?.is_goleiro);
+    if (goleiros.length < 2 || linha.length < 8) return;
+    const [goleiroLaranja, goleiroPreto] = goleiros;
+    const linhaSorteada = [...linha.slice(0, 8)].sort(() => Math.random() - 0.5);
+    setTimesSorteados({
+      laranja: [goleiroLaranja, ...linhaSorteada.slice(0, 4)],
+      preto: [goleiroPreto, ...linhaSorteada.slice(4, 8)]
+    });
+    setFilaRestante([...goleiros.slice(2), ...linha.slice(8)]);
+    setModalTimesOpen(true);
+    setErroTimes(null);
+  };
+
+  // Funções para mover jogadores entre times/fila
+  const moverParaTime = (jogador, time) => {
+    setTimesSorteados(prev => {
+      const outroTime = time === 'laranja' ? 'preto' : 'laranja';
+      return {
+        ...prev,
+        [time]: [...prev[time], jogador],
+        [outroTime]: prev[outroTime].filter(j => j.jogador_id !== jogador.jogador_id)
+      };
+    });
+    setFilaRestante(prev => prev.filter(j => j.jogador_id !== jogador.jogador_id));
+  };
+  const removerDoTime = (jogador, time) => {
+    setTimesSorteados(prev => ({
+      ...prev,
+      [time]: prev[time].filter(j => j.jogador_id !== jogador.jogador_id)
+    }));
+    setFilaRestante(prev => [...prev, jogador]);
+  };
+
+  // Validação antes de confirmar
+  const validarTimes = () => {
+    const goleirosL = timesSorteados.laranja.filter(j => j.jogador?.is_goleiro).length;
+    const goleirosP = timesSorteados.preto.filter(j => j.jogador?.is_goleiro).length;
+    if (timesSorteados.laranja.length !== 5 || timesSorteados.preto.length !== 5) {
+      setErroTimes('Cada time deve ter 5 jogadores.');
+      return false;
+    }
+    if (goleirosL < 1 || goleirosP < 1) {
+      setErroTimes('Cada time deve ter pelo menos 1 goleiro.');
+      return false;
+    }
+    setErroTimes(null);
+    return true;
+  };
+
+  // Confirmação: atualiza banco/fila/times
+  const confirmarTimes = async () => {
+    if (!validarTimes() || !partidaAtual) return;
+    try {
+      // Adiciona jogadores aos times
+      for (const j of timesSorteados.laranja) {
+        await adicionarJogadorPartida.mutateAsync({ partida_id: partidaAtual.id, jogador_id: j.jogador_id, time: 'LARANJA' });
+      }
+      for (const j of timesSorteados.preto) {
+        await adicionarJogadorPartida.mutateAsync({ partida_id: partidaAtual.id, jogador_id: j.jogador_id, time: 'PRETO' });
+      }
+      setModalTimesOpen(false);
+      toast({ title: 'Times confirmados!' });
+      refetch();
+    } catch (err: any) {
+      setErroTimes(err.message || 'Erro ao confirmar times');
+    }
+  };
+
+  // Função para lógica pós-partida
+  const logicaPosPartida = async (resultado: 'LARANJA' | 'PRETO' | 'EMPATE') => {
+    if (!partidaAtual || !partidaAtual.domingo) return;
+    const domingo = partidaAtual.domingo;
+    const jogadoresLaranja = (partidaAtual.jogadores_por_partida || []).filter(jp => jp.time === 'LARANJA');
+    const jogadoresPreto = (partidaAtual.jogadores_por_partida || []).filter(jp => jp.time === 'PRETO');
+    const totalJogadores = (partidaAtual.jogadores_por_partida || []).length;
+    const isQuatroTimes = totalJogadores >= 20; // 4 times = 20 jogadores (16 linha + 4 goleiros)
+    let vitoriasL = domingo.vitorias_laranja_consecutivas || 0;
+    let vitoriasP = domingo.vitorias_preto_consecutivas || 0;
+    let timeSai = [];
+    let timeFica = [];
+    let prioridadeFila = null;
+    let mensagem = '';
+
+    // Empate
+    if (resultado === 'EMPATE') {
+      if (isQuatroTimes) {
+        timeSai = [...jogadoresLaranja, ...jogadoresPreto];
+        mensagem = 'Empate: ambos os times saem para dar lugar aos próximos.';
+      } else {
+        setModalParImpar(true);
+        return; // Modal decidirá quem sai
+      }
+      vitoriasL = 0;
+      vitoriasP = 0;
+    } else {
+      // Vitória/Derrota
+      if (resultado === 'LARANJA') {
+        vitoriasL += 1;
+        vitoriasP = 0;
+        if (vitoriasL === 3) {
+          timeSai = [...jogadoresLaranja, ...jogadoresPreto];
+          prioridadeFila = 'LARANJA';
+          mensagem = 'Laranja venceu a 3ª seguida: ambos os times saem, Laranja tem prioridade na fila.';
+          vitoriasL = 0;
+        } else {
+          timeSai = jogadoresPreto;
+          timeFica = jogadoresLaranja;
+          mensagem = 'Laranja venceu: Preto vai para a fila, Laranja permanece.';
+        }
+      } else if (resultado === 'PRETO') {
+        vitoriasP += 1;
+        vitoriasL = 0;
+        if (vitoriasP === 3) {
+          timeSai = [...jogadoresLaranja, ...jogadoresPreto];
+          prioridadeFila = 'PRETO';
+          mensagem = 'Preto venceu a 3ª seguida: ambos os times saem, Preto tem prioridade na fila.';
+          vitoriasP = 0;
+        } else {
+          timeSai = jogadoresLaranja;
+          timeFica = jogadoresPreto;
+          mensagem = 'Preto venceu: Laranja vai para a fila, Preto permanece.';
+        }
+      }
+    }
+    // Atualizar vitórias consecutivas
+    await atualizarVitoriasConsecutivas.mutateAsync({ domingo_id: domingo.id, cor: 'LARANJA', valor: vitoriasL });
+    await atualizarVitoriasConsecutivas.mutateAsync({ domingo_id: domingo.id, cor: 'PRETO', valor: vitoriasP });
+    // Atualizar fila: adicionar timeSai ao final (prioridade se aplicável)
+    // ... (aqui entraria a lógica de atualizar a fila no banco)
+    setMensagemPosPartida(mensagem);
+    // Atualizar interface (refetch etc)
+    refetch();
+  };
+
+  // Handler para decisão de par ou ímpar
+  const decidirParImpar = (vencedor: 'LARANJA' | 'PRETO') => {
+    setParImparVencedor(vencedor);
+    setModalParImpar(false);
+    // O time que perder o par ou ímpar sai
+    logicaPosPartida(vencedor === 'LARANJA' ? 'PRETO' : 'LARANJA');
   };
 
   useEffect(() => {
@@ -340,6 +496,11 @@ const PartidaAoVivo = () => {
               </CardContent>
             </Card>
           )}
+
+          {/* Botão Sortear Times */}
+          {isModerador && filaEspera.filter(f => f.jogador?.is_goleiro).length >= 2 && filaEspera.filter(f => !f.jogador?.is_goleiro).length >= 8 && (
+            <Button className="mb-4" onClick={sortearTimes} variant="secondary">Sortear Times</Button>
+          )}
         </div>
       )}
 
@@ -401,6 +562,72 @@ const PartidaAoVivo = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Modal de Montagem dos Times */}
+      <Dialog open={modalTimesOpen} onOpenChange={setModalTimesOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Montagem dos Times</DialogTitle>
+          </DialogHeader>
+          <div className="flex gap-4">
+            <div className="flex-1">
+              <h3 className="font-bold text-orange-600 mb-2">Laranja</h3>
+              {timesSorteados.laranja.map(j => (
+                <div key={j.jogador_id} className="flex items-center gap-2 mb-1">
+                  <span>{j.jogador?.nome}</span>
+                  <Button size="xs" variant="outline" onClick={() => removerDoTime(j, 'laranja')}>Remover</Button>
+                </div>
+              ))}
+              <Button size="sm" variant="ghost" onClick={() => {}} disabled>Adicionar</Button>
+            </div>
+            <div className="flex-1">
+              <h3 className="font-bold text-black mb-2">Preto</h3>
+              {timesSorteados.preto.map(j => (
+                <div key={j.jogador_id} className="flex items-center gap-2 mb-1">
+                  <span>{j.jogador?.nome}</span>
+                  <Button size="xs" variant="outline" onClick={() => removerDoTime(j, 'preto')}>Remover</Button>
+                </div>
+              ))}
+              <Button size="sm" variant="ghost" onClick={() => {}} disabled>Adicionar</Button>
+            </div>
+            <div className="flex-1">
+              <h3 className="font-bold text-blue-600 mb-2">Fila de Espera</h3>
+              {filaRestante.map(j => (
+                <div key={j.jogador_id} className="flex items-center gap-2 mb-1">
+                  <span>{j.jogador?.nome}</span>
+                  <Button size="xs" variant="outline" onClick={() => moverParaTime(j, timesSorteados.laranja.length < 5 ? 'laranja' : 'preto')}>Colocar em {timesSorteados.laranja.length < 5 ? 'Laranja' : 'Preto'}</Button>
+                </div>
+              ))}
+            </div>
+          </div>
+          {erroTimes && <div className="text-red-600 text-sm mt-2">{erroTimes}</div>}
+          <Button onClick={confirmarTimes} disabled={adicionarJogadorPartida.isPending} className="mt-4 w-full">
+            {adicionarJogadorPartida.isPending ? 'Confirmando...' : 'Confirmar Times'}
+          </Button>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Par ou Ímpar */}
+      <Dialog open={modalParImpar} onOpenChange={setModalParImpar}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Empate: Par ou Ímpar dos Goleiros</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p>Selecione qual time venceu o par ou ímpar:</p>
+            <Button onClick={() => decidirParImpar('LARANJA')}>Laranja</Button>
+            <Button onClick={() => decidirParImpar('PRETO')}>Preto</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      {/* Mensagem Pós-Partida */}
+      {mensagemPosPartida && (
+        <Card className="border-2 border-green-500 bg-green-50">
+          <CardContent>
+            <span className="text-green-900 font-bold">{mensagemPosPartida}</span>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };

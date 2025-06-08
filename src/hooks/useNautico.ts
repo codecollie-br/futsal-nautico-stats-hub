@@ -260,3 +260,21 @@ export const useAdicionarFilaEspera = () => {
     }
   });
 };
+
+// Hook para atualizar vitórias consecutivas por cor
+export const useAtualizarVitoriasConsecutivas = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ domingo_id, cor, valor }: { domingo_id: number, cor: 'LARANJA' | 'PRETO', valor: number }) => {
+      const field = cor === 'LARANJA' ? 'vitorias_laranja_consecutivas' : 'vitorias_preto_consecutivas';
+      const { error } = await supabase
+        .from('domingos')
+        .update({ [field]: valor })
+        .eq('id', domingo_id);
+      if (error) throw error;
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['domingos'] });
+    }
+  });
+};
