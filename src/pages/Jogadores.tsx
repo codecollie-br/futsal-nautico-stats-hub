@@ -42,11 +42,11 @@ const Jogadores = () => {
     mutationFn: async (payload: any) => {
       if (payload.id) {
         // Editar
-        const { error } = await supabase.from('jogadores').update(payload).eq('id', payload.id);
+        const { error } = await supabase.from('jogadores', { schema: 'nautico' }).update(payload).eq('id', payload.id);
         if (error) throw error;
       } else {
         // Criar
-        const { error } = await supabase.from('jogadores').insert(payload);
+        const { error } = await supabase.from('jogadores', { schema: 'nautico' }).insert(payload);
         if (error) throw error;
       }
     },
@@ -196,7 +196,13 @@ const Jogadores = () => {
           <DialogHeader>
             <DialogTitle>{editJogador ? 'Editar Jogador' : 'Novo Jogador'}</DialogTitle>
           </DialogHeader>
-          <JogadorForm jogador={editJogador} onSave={handleSaveJogador} />
+          <JogadorForm
+            jogador={editJogador} 
+            onSave={(dados) => {
+              handleSaveJogador(dados);
+              setModalOpen(false);
+            }}
+          />
         </DialogContent>
       </Dialog>
     </div>

@@ -9,7 +9,7 @@ export const useJogadores = () => {
     queryKey: ['jogadores'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('jogadores')
+        .from('jogadores', { schema: 'nautico' })
         .select('*')
         .order('nome');
       
@@ -192,7 +192,7 @@ export const useAdicionarJogadorPartida = () => {
       time: TimeEnum;
     }) => {
       const { data, error } = await supabase
-        .from('jogadores_por_partida')
+        .from('jogadores_por_partida', { schema: 'nautico' })
         .insert({ partida_id, jogador_id, time })
         .select()
         .single();
