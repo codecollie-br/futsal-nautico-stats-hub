@@ -12,7 +12,7 @@ interface PlayerStats {
 }
 
 // Função auxiliar para agregar estatísticas básicas dos jogadores
-const aggregatePlayerStats = (domingoDetalhes: Domingo): Map<number, PlayerStats> => {
+export const aggregatePlayerStats = (domingoDetalhes: Domingo): Map<number, PlayerStats> => {
   const playerStatsMap = new Map<number, PlayerStats>();
 
   for (const partida of domingoDetalhes.partidas) {
