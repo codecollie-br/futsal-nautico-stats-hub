@@ -227,3 +227,36 @@ export const useRegistrarEvento = () => {
     }
   });
 };
+
+// Hook para buscar fila de espera do domingo atual
+export const useFilaEspera = (domingo_id?: number) => {
+  return useQuery({
+    queryKey: ['fila-espera', domingo_id],
+    queryFn: async () => {
+      if (!domingo_id) return [];
+      const { data, error } = await supabase
+        .from('fila_espera')
+        .select('*, jogador:jogadores(*)')
+        .eq('domingo_id', domingo_id)
+        .order('ordem');
+      if (error) throw error;
+      return data || [];
+    }
+  });
+};
+
+// Hook para adicionar jogador à fila de espera
+export const useAdicionarFilaEspera = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ domingo_id, jogador_id, ordem }: { domingo_id: number, jogador_id: number, ordem: number }) => {
+      const { error } = await supabase
+        .from('fila_espera')
+        .insert({ domingo_id, jogador_id, ordem });
+      if (error) throw error;
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['fila-espera', variables.domingo_id] });
+    }
+  });
+};

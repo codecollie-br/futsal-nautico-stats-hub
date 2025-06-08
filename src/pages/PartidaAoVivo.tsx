@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { usePartidaAtual, useCreateDomingo, useCreatePartida, useIniciarPartida, useFinalizarPartida, useRegistrarEvento } from "@/hooks/useNautico";
+import { usePartidaAtual, useCreateDomingo, useCreatePartida, useIniciarPartida, useFinalizarPartida, useRegistrarEvento, useFilaEspera, useAdicionarFilaEspera, useJogadores } from "@/hooks/useNautico";
 import { useToast } from "@/hooks/use-toast";
 import Cronometro from "@/components/partida/Cronometro";
 import PlacarPartida from "@/components/partida/PlacarPartida";
@@ -29,6 +29,19 @@ const PartidaAoVivo = () => {
   const [assistenteId, setAssistenteId] = useState<number | null>(null);
   const [golContra, setGolContra] = useState(false);
   const [erroGol, setErroGol] = useState<string | null>(null);
+
+  const domingoId = partidaAtual?.domingo?.id;
+  const { data: filaEspera = [] } = useFilaEspera(domingoId);
+  const { data: jogadores = [] } = useJogadores();
+  const adicionarFila = useAdicionarFilaEspera();
+  const [modalAddJogador, setModalAddJogador] = useState(false);
+  const [jogadorSelecionado, setJogadorSelecionado] = useState<number | null>(null);
+  const [erroAdd, setErroAdd] = useState<string | null>(null);
+
+  // Jogadores já em times ou na fila
+  const jogadoresEmTimes = new Set((partidaAtual?.jogadores_por_partida || []).map(jp => jp.jogador_id));
+  const jogadoresNaFila = new Set(filaEspera.map(f => f.jogador_id));
+  const jogadoresDisponiveis = jogadores.filter(j => !jogadoresEmTimes.has(j.id) && !jogadoresNaFila.has(j.id));
 
   const handleTempoChange = useCallback((segundos: number) => {
     setTempoAtual(segundos);
@@ -149,6 +162,26 @@ const PartidaAoVivo = () => {
       toast({ title: 'Gol registrado!' });
     } catch (err: any) {
       setErroGol(err.message || 'Erro ao registrar gol');
+    }
+  };
+
+  const handleAddJogadorFila = async () => {
+    if (!domingoId || !jogadorSelecionado) {
+      setErroAdd('Selecione um jogador.');
+      return;
+    }
+    try {
+      await adicionarFila.mutateAsync({
+        domingo_id: domingoId,
+        jogador_id: jogadorSelecionado,
+        ordem: filaEspera.length + 1
+      });
+      setModalAddJogador(false);
+      setJogadorSelecionado(null);
+      setErroAdd(null);
+      toast({ title: 'Jogador adicionado à fila!' });
+    } catch (err: any) {
+      setErroAdd(err.message || 'Erro ao adicionar jogador');
     }
   };
 
@@ -285,6 +318,28 @@ const PartidaAoVivo = () => {
               </Button>
             </div>
           )}
+
+          {/* Fila de Espera */}
+          {partidaAtual && (
+            <Card className="border-2 border-dashed border-blue-400 bg-blue-50">
+              <CardHeader>
+                <CardTitle>Fila de Espera</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap gap-2 items-center mb-2">
+                  {filaEspera.length === 0 && <span className="text-gray-500">Nenhum jogador na fila de espera</span>}
+                  {filaEspera.map((f, idx) => (
+                    <span key={f.jogador_id} className="px-3 py-1 rounded-full bg-blue-200 text-blue-900 font-semibold border border-blue-400">
+                      {idx + 1}. {f.jogador?.nome || 'Desconhecido'}
+                    </span>
+                  ))}
+                </div>
+                <Button variant="outline" onClick={() => setModalAddJogador(true)}>
+                  Adicionar Jogador
+                </Button>
+              </CardContent>
+            </Card>
+          )}
         </div>
       )}
 
@@ -321,6 +376,27 @@ const PartidaAoVivo = () => {
             {erroGol && <div className="text-red-600 text-sm">{erroGol}</div>}
             <Button onClick={handleRegistrarGol} disabled={registrarEvento.isPending}>
               {registrarEvento.isPending ? 'Registrando...' : 'Registrar Gol'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Adicionar Jogador */}
+      <Dialog open={modalAddJogador} onOpenChange={setModalAddJogador}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Adicionar Jogador à Fila</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Select value={jogadorSelecionado?.toString() || ''} onValueChange={v => setJogadorSelecionado(Number(v))}>
+              <option value="">Selecione um jogador</option>
+              {jogadoresDisponiveis.map(j => (
+                <option key={j.id} value={j.id}>{j.nome}</option>
+              ))}
+            </Select>
+            {erroAdd && <div className="text-red-600 text-sm">{erroAdd}</div>}
+            <Button onClick={handleAddJogadorFila} disabled={adicionarFila.isPending}>
+              {adicionarFila.isPending ? 'Adicionando...' : 'Adicionar'}
             </Button>
           </div>
         </DialogContent>
