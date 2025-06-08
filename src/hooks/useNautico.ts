@@ -55,9 +55,9 @@ export const usePartidaAtual = () => {
           eventos_partida(*)
         `)
         .eq('status', 'EM_ANDAMENTO')
-        .single();
+        .maybeSingle();
       
-      if (error && error.code !== 'PGRST116') throw error;
+      if (error) throw error;
       return data as Partida | null;
     }
   });
@@ -218,18 +218,6 @@ export const useRegistrarEvento = () => {
         .single();
       
       if (error) throw error;
-      
-      // Atualizar placar se for gol
-      if (evento.tipo_evento === 'GOL' && evento.time_marcador) {
-        const placarField = evento.time_marcador === 'LARANJA' ? 'time_laranja_gols' : 'time_preto_gols';
-        
-        await supabase.rpc('increment', {
-          table_name: 'partidas',
-          row_id: evento.partida_id,
-          column_name: placarField
-        });
-      }
-      
       return data;
     },
     onSuccess: () => {

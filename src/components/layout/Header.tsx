@@ -19,13 +19,13 @@ const Header = () => {
   const isActive = (path: string) => location.pathname === path;
 
   return (
-    <header className="bg-red-600 text-white shadow-lg sticky top-0 z-50">
+    <header className="bg-orange-600 text-white shadow-lg sticky top-0 z-50">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link to="/" className="flex items-center space-x-2">
             <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center">
-              <span className="text-red-600 font-bold text-sm">N</span>
+              <span className="text-orange-600 font-bold text-sm">N</span>
             </div>
             <span className="font-bold text-xl hidden sm:block">Futsal Náutico</span>
           </Link>
@@ -38,8 +38,8 @@ const Header = () => {
                 to={item.path}
                 className={`flex items-center space-x-2 px-3 py-2 rounded-md transition-colors ${
                   isActive(item.path)
-                    ? "bg-red-700 text-white"
-                    : "text-red-100 hover:bg-red-500 hover:text-white"
+                    ? "bg-orange-700 text-white"
+                    : "text-orange-100 hover:bg-orange-500 hover:text-white"
                 }`}
               >
                 <item.icon className="w-4 h-4" />
@@ -52,7 +52,7 @@ const Header = () => {
           <Button
             variant="ghost"
             size="sm"
-            className="md:hidden text-white hover:bg-red-500"
+            className="md:hidden text-white hover:bg-orange-500"
             onClick={() => setIsMenuOpen(!isMenuOpen)}
           >
             {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -69,8 +69,8 @@ const Header = () => {
                   to={item.path}
                   className={`flex items-center space-x-2 px-3 py-2 rounded-md transition-colors ${
                     isActive(item.path)
-                      ? "bg-red-700 text-white"
-                      : "text-red-100 hover:bg-red-500 hover:text-white"
+                      ? "bg-orange-700 text-white"
+                      : "text-orange-100 hover:bg-orange-500 hover:text-white"
                   }`}
                   onClick={() => setIsMenuOpen(false)}
                 >

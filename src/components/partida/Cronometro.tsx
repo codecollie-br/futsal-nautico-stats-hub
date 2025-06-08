@@ -54,7 +54,7 @@ const Cronometro = ({ onTempoChange, onStatusChange, isPartidaAtiva }: Cronometr
     <Card className="mb-6">
       <CardContent className="p-6">
         <div className="text-center">
-          <div className="text-6xl font-mono font-bold text-red-600 mb-4">
+          <div className="text-6xl font-mono font-bold text-orange-600 mb-4">
             {formatarTempo(tempo)}
           </div>
           
