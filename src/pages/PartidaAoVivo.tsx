@@ -1,15 +1,16 @@
 import { useState, useCallback, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { usePartidaAtual, useCreateDomingo, useCreatePartida, useIniciarPartida, useFinalizarPartida, useRegistrarEvento, useFilaEspera, useAdicionarFilaEspera, useJogadores, useAdicionarJogadorPartida, useAtualizarVitoriasConsecutivas } from "@/hooks/useNautico";
+import { usePartidaAtual, useCreateDomingo, useCreatePartida, useIniciarPartida, useFinalizarPartida, useRegistrarEvento, useFilaEspera, useAdicionarFilaEspera, useJogadores, useAdicionarJogadorPartida, useAtualizarVitoriasConsecutivas, useRemoverJogadorPartida, useRemoverFilaEspera } from "@/hooks/useNautico";
 import { useToast } from "@/hooks/use-toast";
 import Cronometro from "@/components/partida/Cronometro";
 import PlacarPartida from "@/components/partida/PlacarPartida";
-import { Plus, Play } from "lucide-react";
+import { Plus, Play, Replace } from "lucide-react";
 import { useLocation } from "react-router-dom";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useSound } from "@/hooks/useSound";
 
 const PartidaAoVivo = () => {
   const { data: partidaAtual, refetch } = usePartidaAtual();
@@ -34,9 +35,14 @@ const PartidaAoVivo = () => {
   const { data: filaEspera = [] } = useFilaEspera(domingoId);
   const { data: jogadores = [] } = useJogadores();
   const adicionarFila = useAdicionarFilaEspera();
+  const removerFila = useRemoverFilaEspera();
   const [modalAddJogador, setModalAddJogador] = useState(false);
   const [jogadorSelecionado, setJogadorSelecionado] = useState<number | null>(null);
   const [erroAdd, setErroAdd] = useState<string | null>(null);
+
+  // Sons
+  const { play: playGolSound } = useSound('/sounds/gol.mp3');
+  const { play: playApitoFinalSound } = useSound('/sounds/apito_final.mp3');
 
   // Jogadores já em times ou na fila
   const jogadoresEmTimes = new Set((partidaAtual?.jogadores_por_partida || []).map(jp => jp.jogador_id));
@@ -44,6 +50,7 @@ const PartidaAoVivo = () => {
   const jogadoresDisponiveis = jogadores.filter(j => !jogadoresEmTimes.has(j.id) && !jogadoresNaFila.has(j.id));
 
   const adicionarJogadorPartida = useAdicionarJogadorPartida();
+  const removerJogadorPartida = useRemoverJogadorPartida();
   const [modalTimesOpen, setModalTimesOpen] = useState(false);
   const [timesSorteados, setTimesSorteados] = useState<{ laranja: any[]; preto: any[] }>({ laranja: [], preto: [] });
   const [filaRestante, setFilaRestante] = useState<any[]>([]);
@@ -53,6 +60,12 @@ const PartidaAoVivo = () => {
   const [modalParImpar, setModalParImpar] = useState(false);
   const [parImparVencedor, setParImparVencedor] = useState<'LARANJA' | 'PRETO' | null>(null);
   const [mensagemPosPartida, setMensagemPosPartida] = useState<string | null>(null);
+
+  // Estado para substituição
+  const [modalSubstituicaoOpen, setModalSubstituicaoOpen] = useState(false);
+  const [jogadorSaiId, setJogadorSaiId] = useState<number | null>(null);
+  const [jogadorEntraId, setJogadorEntraId] = useState<number | null>(null);
+  const [erroSubstituicao, setErroSubstituicao] = useState<string | null>(null);
 
   const handleTempoChange = useCallback((segundos: number) => {
     setTempoAtual(segundos);
@@ -130,6 +143,7 @@ const PartidaAoVivo = () => {
         title: "Partida finalizada!",
         description: "A partida foi finalizada com sucesso",
       });
+      playApitoFinalSound();
       
       refetch();
     } catch (error) {
@@ -171,6 +185,7 @@ const PartidaAoVivo = () => {
       });
       setModalGolOpen(false);
       toast({ title: 'Gol registrado!' });
+      playGolSound();
     } catch (err: any) {
       setErroGol(err.message || 'Erro ao registrar gol');
     }
@@ -196,6 +211,74 @@ const PartidaAoVivo = () => {
     }
   };
 
+  // Função de substituição
+  const handleSubstituicao = async () => {
+    if (!partidaAtual || !jogadorSaiId || !jogadorEntraId) {
+      setErroSubstituicao('Selecione o jogador que sai e o que entra.');
+      return;
+    }
+    if (jogadorSaiId === jogadorEntraId) {
+      setErroSubstituicao('O jogador que sai não pode ser o mesmo que entra.');
+      return;
+    }
+
+    // Verificar se o jogador que entra está na fila de espera
+    const jogadorEntraNaFila = filaEspera.find(f => f.jogador_id === jogadorEntraId);
+    if (!jogadorEntraNaFila) {
+      setErroSubstituicao('O jogador que entra deve estar na fila de espera.');
+      return;
+    }
+
+    try {
+      // 1. Remover jogador que sai da partida
+      const jogadorSai = partidaAtual.jogadores_por_partida?.find(jp => jp.jogador_id === jogadorSaiId);
+      if (jogadorSai) {
+        await removerJogadorPartida.mutateAsync(jogadorSai.id);
+      }
+
+      // 2. Adicionar jogador que entra na partida (com o mesmo time do que saiu)
+      const timeDoJogadorQueSai = partidaAtual.jogadores_por_partida?.find(jp => jp.jogador_id === jogadorSaiId)?.time;
+      if (timeDoJogadorQueSai) {
+        await adicionarJogadorPartida.mutateAsync({
+          partida_id: partidaAtual.id,
+          jogador_id: jogadorEntraId,
+          time: timeDoJogadorQueSai
+        });
+      }
+
+      // 3. Registrar evento de substituição
+      await registrarEvento.mutateAsync({
+        partida_id: partidaAtual.id,
+        tipo_evento: 'SUBSTITUICAO',
+        minuto_partida: Math.floor(tempoAtual / 60),
+        jogador_sai_id: jogadorSaiId,
+        jogador_entra_id: jogadorEntraId,
+      });
+
+      // 4. Mover o jogador que saiu para o final da fila de espera (se já não estiver lá)
+      const jogadorSaiExisteNaFila = filaEspera.some(f => f.jogador_id === jogadorSaiId);
+      if (!jogadorSaiExisteNaFila) {
+        await adicionarFila.mutateAsync({
+          domingo_id: domingoId,
+          jogador_id: jogadorSaiId,
+          ordem: filaEspera.length + 1 // Adiciona no final
+        });
+      }
+
+      // 5. Remover o jogador que entrou da fila de espera
+      await removerFila.mutateAsync(jogadorEntraNaFila.id); // Usar o ID da fila de espera
+
+      toast({ title: 'Substituição realizada!' });
+      setModalSubstituicaoOpen(false);
+      setJogadorSaiId(null);
+      setJogadorEntraId(null);
+      setErroSubstituicao(null);
+      refetch();
+    } catch (err: any) {
+      setErroSubstituicao(err.message || 'Erro ao realizar substituição');
+    }
+  };
+
   // Função para sortear times conforme regra
   const sortearTimes = () => {
     const goleiros = filaEspera.filter(f => f.jogador?.is_goleiro);
@@ -213,21 +296,21 @@ const PartidaAoVivo = () => {
   };
 
   // Funções para mover jogadores entre times/fila
-  const moverParaTime = (jogador, time) => {
+  const moverParaTime = (jogador: any, time: 'laranja' | 'preto') => {
     setTimesSorteados(prev => {
       const outroTime = time === 'laranja' ? 'preto' : 'laranja';
       return {
         ...prev,
         [time]: [...prev[time], jogador],
-        [outroTime]: prev[outroTime].filter(j => j.jogador_id !== jogador.jogador_id)
+        [outroTime]: prev[outroTime].filter((j: any) => j.jogador_id !== jogador.jogador_id)
       };
     });
-    setFilaRestante(prev => prev.filter(j => j.jogador_id !== jogador.jogador_id));
+    setFilaRestante(prev => prev.filter((j: any) => j.jogador_id !== jogador.jogador_id));
   };
-  const removerDoTime = (jogador, time) => {
+  const removerDoTime = (jogador: any, time: 'laranja' | 'preto') => {
     setTimesSorteados(prev => ({
       ...prev,
-      [time]: prev[time].filter(j => j.jogador_id !== jogador.jogador_id)
+      [time]: prev[time].filter((j: any) => j.jogador_id !== jogador.jogador_id)
     }));
     setFilaRestante(prev => [...prev, jogador]);
   };
@@ -326,8 +409,9 @@ const PartidaAoVivo = () => {
     // Atualizar vitórias consecutivas
     await atualizarVitoriasConsecutivas.mutateAsync({ domingo_id: domingo.id, cor: 'LARANJA', valor: vitoriasL });
     await atualizarVitoriasConsecutivas.mutateAsync({ domingo_id: domingo.id, cor: 'PRETO', valor: vitoriasP });
-    // Atualizar fila: adicionar timeSai ao final (prioridade se aplicável)
-    // ... (aqui entraria a lógica de atualizar a fila no banco)
+    // TODO: Atualizar fila: adicionar timeSai ao final (prioridade se aplicável)
+    // A implementação da remoção da fila de espera do jogador que entra e
+    // a adição do jogador que sai (se ainda não estiver) é um TODO aqui.
     setMensagemPosPartida(mensagem);
     // Atualizar interface (refetch etc)
     refetch();
@@ -350,6 +434,11 @@ const PartidaAoVivo = () => {
     const token = params.get("token");
     setIsModerador(token === partidaAtual.domingo.token_moderacao);
   }, [location.search, partidaAtual?.domingo?.token_moderacao]);
+
+  // Jogadores em campo (para a seleção de quem sai)
+  const jogadoresEmCampo = partidaAtual?.jogadores_por_partida?.map(jp => jp.jogador).filter(Boolean) || [];
+  // Jogadores que podem entrar (fila de espera e não estão em campo)
+  const jogadoresAptosParaEntrar = filaEspera.filter(f => !jogadoresEmCampo.some(j => j?.id === f.jogador_id));
 
   return (
     <div className="space-y-6">
@@ -428,6 +517,18 @@ const PartidaAoVivo = () => {
                   </div>
                 )}
               </div>
+              {partidaAtual.status === 'EM_ANDAMENTO' && isModerador && (
+                <div className="mt-4 text-center">
+                  <Button 
+                    onClick={() => setModalSubstituicaoOpen(true)}
+                    variant="secondary"
+                    size="lg"
+                  >
+                    <Replace className="w-4 h-4 mr-2" />
+                    Substituição
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -604,6 +705,39 @@ const PartidaAoVivo = () => {
           <Button onClick={confirmarTimes} disabled={adicionarJogadorPartida.isPending} className="mt-4 w-full">
             {adicionarJogadorPartida.isPending ? 'Confirmando...' : 'Confirmar Times'}
           </Button>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Substituição */}
+      <Dialog open={modalSubstituicaoOpen} onOpenChange={setModalSubstituicaoOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Realizar Substituição</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="block mb-1">Jogador que Sai</label>
+              <Select value={jogadorSaiId?.toString() || ''} onValueChange={v => setJogadorSaiId(Number(v))}>
+                <option value="">Selecione o jogador em campo</option>
+                {jogadoresEmCampo.map((j: any) => (
+                  <option key={j.id} value={j.id}>{j.nome}</option>
+                ))}
+              </Select>
+            </div>
+            <div>
+              <label className="block mb-1">Jogador que Entra</label>
+              <Select value={jogadorEntraId?.toString() || ''} onValueChange={v => setJogadorEntraId(Number(v))}>
+                <option value="">Selecione o jogador da fila de espera</option>
+                {jogadoresAptosParaEntrar.map((f: any) => (
+                  <option key={f.jogador.id} value={f.jogador.id}>{f.jogador.nome}</option>
+                ))}
+              </Select>
+            </div>
+            {erroSubstituicao && <div className="text-red-600 text-sm">{erroSubstituicao}</div>}
+            <Button onClick={handleSubstituicao} disabled={registrarEvento.isPending || removerJogadorPartida.isPending || adicionarJogadorPartida.isPending || removerFila.isPending}>
+              {registrarEvento.isPending || removerJogadorPartida.isPending || adicionarJogadorPartida.isPending || removerFila.isPending ? 'Realizando...' : 'Realizar Substituição'}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 

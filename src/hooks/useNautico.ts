@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Jogador, Partida, Domingo, EventoPartida, JogadorPorPartida, TimeEnum, TipoEvento } from "@/types/nautico";
+import { Jogador, Partida, Domingo, EventoPartida, JogadorPorPartida, TimeEnum, TipoEvento, VotoCraqueDomingo } from "@/types/nautico";
 import { nanoid } from 'nanoid';
 
 // Hook para buscar jogadores
@@ -275,6 +275,186 @@ export const useAtualizarVitoriasConsecutivas = () => {
     },
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['domingos'] });
+    }
+  });
+};
+
+// Hook para remover jogador de uma partida
+export const useRemoverJogadorPartida = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (jogador_por_partida_id: number) => {
+      const { error } = await supabase
+        .from('jogadores_por_partida')
+        .delete()
+        .eq('id', jogador_por_partida_id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['partida-atual'] });
+    }
+  });
+};
+
+// Hook para remover jogador da fila de espera
+export const useRemoverFilaEspera = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (fila_espera_id: number) => {
+      const { error } = await supabase
+        .from('fila_espera')
+        .delete()
+        .eq('id', fila_espera_id);
+      if (error) throw error;
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['fila-espera'] });
+      queryClient.invalidateQueries({ queryKey: ['partida-atual'] }); // Para atualizar a lista de aptos
+    }
+  });
+};
+
+// Hook para liberar a votação do Craque do Domingo
+export const useLiberarVotacaoCraque = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (domingo_id: number) => {
+      const { data, error } = await supabase
+        .from('domingos')
+        .update({ votacao_liberada: true })
+        .eq('id', domingo_id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['domingos'] });
+      queryClient.invalidateQueries({ queryKey: ['partida-atual'] }); // Se a partida atual for a do domingo em questão
+    }
+  });
+};
+
+// Hook para registrar um voto no Craque do Domingo
+export const useRegistrarVotoCraque = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (voto: { domingo_id: number, votante_jogador_id: number, votado_jogador_id: number }) => {
+      const { data, error } = await supabase
+        .from('votos_craque_domingo')
+        .insert(voto)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['votos-craque-domingo', variables.domingo_id] });
+      queryClient.invalidateQueries({ queryKey: ['partida-atual'] }); // Para revalidar o estado da votação na partida atual
+    }
+  });
+};
+
+// Hook para buscar os votos de um domingo específico
+export const useVotosCraqueDomingo = (domingo_id?: number) => {
+  return useQuery({
+    queryKey: ['votos-craque-domingo', domingo_id],
+    queryFn: async () => {
+      if (!domingo_id) return [];
+      const { data, error } = await supabase
+        .from('votos_craque_domingo')
+        .select('*, votante:jogadores!votante_jogador_id(*), votado:jogadores!votado_jogador_id(*)')
+        .eq('domingo_id', domingo_id);
+      if (error) throw error;
+      return data as VotoCraqueDomingo[] || [];
+    }
+  });
+};
+
+// Hook para calcular e definir o Craque do Domingo
+export const useCalcularCraqueDomingo = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (domingo_id: number) => {
+      // 1. Obter todos os votos para o domingo
+      const { data: votos, error: votosError } = await supabase
+        .from('votos_craque_domingo')
+        .select('votado_jogador_id')
+        .eq('domingo_id', domingo_id);
+
+      if (votosError) throw votosError;
+
+      if (!votos || votos.length === 0) {
+        // Não há votos para calcular o craque do domingo
+        // Opcional: Definir craque_domingo_id como NULL ou deixar como está
+        const { data, error } = await supabase
+          .from('domingos')
+          .update({ craque_domingo_id: null })
+          .eq('id', domingo_id)
+          .select()
+          .single();
+        if (error) throw error;
+        return data; // Retorna o domingo atualizado sem craque
+      }
+
+      // 2. Contar os votos para cada jogador
+      const contagemVotos: { [jogador_id: number]: number } = {};
+      votos.forEach(voto => {
+        contagemVotos[voto.votado_jogador_id] = (contagemVotos[voto.votado_jogador_id] || 0) + 1;
+      });
+
+      // 3. Encontrar o jogador com mais votos
+      let craqueId: number | null = null;
+      let maxVotos = 0;
+
+      for (const jogador_id in contagemVotos) {
+        if (contagemVotos[jogador_id] > maxVotos) {
+          maxVotos = contagemVotos[jogador_id];
+          craqueId = Number(jogador_id);
+        }
+      }
+      
+      // 4. Atualizar o domingo com o craque eleito
+      const { data, error } = await supabase
+        .from('domingos')
+        .update({ craque_domingo_id: craqueId })
+        .eq('id', domingo_id)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data; // Retorna o domingo atualizado com o craque
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['domingos'] });
+      queryClient.invalidateQueries({ queryKey: ['votos-craque-domingo', variables.domingo_id] });
+    }
+  });
+};
+
+// Hook para obter detalhes completos de um domingo, incluindo partidas e eventos
+export const useDomingoDetalhes = (domingo_id?: number) => {
+  return useQuery({
+    queryKey: ['domingo-detalhes', domingo_id],
+    queryFn: async () => {
+      if (!domingo_id) return null;
+      const { data, error } = await supabase
+        .from('domingos')
+        .select(`
+          *,
+          partidas(
+            *,
+            jogadores_por_partida(
+              *,
+              jogador:jogadores(*)
+            ),
+            eventos_partida(*)
+          )
+        `)
+        .eq('id', domingo_id)
+        .single();
+      if (error) throw error;
+      return data;
     }
   });
 };

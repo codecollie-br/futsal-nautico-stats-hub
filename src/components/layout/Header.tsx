@@ -1,8 +1,8 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Menu, X, Home, Users, Trophy, Calendar, Settings } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
+import { ModeToggle } from "@/components/ui/mode-toggle";
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -48,15 +48,18 @@ const Header = () => {
             ))}
           </nav>
 
-          {/* Mobile Menu Button */}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="md:hidden text-white hover:bg-orange-500"
-            onClick={() => setIsMenuOpen(!isMenuOpen)}
-          >
-            {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-          </Button>
+          {/* Mobile Menu Button e ModeToggle */}
+          <div className="flex items-center space-x-2">
+            <ModeToggle />
+            <Button
+              variant="ghost"
+              size="sm"
+              className="md:hidden text-white hover:bg-orange-500"
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+            >
+              {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </Button>
+          </div>
         </div>
 
         {/* Mobile Navigation */}
@@ -78,6 +81,9 @@ const Header = () => {
                   <span>{item.label}</span>
                 </Link>
               ))}
+              <div className="px-3 py-2">
+                <ModeToggle />
+              </div>
             </div>
           </nav>
         )}

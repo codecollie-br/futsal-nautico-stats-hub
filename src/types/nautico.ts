@@ -24,6 +24,8 @@ export interface Domingo {
   token_moderacao?: string;
   vitorias_laranja_consecutivas?: number;
   vitorias_preto_consecutivas?: number;
+  votacao_liberada?: boolean;
+  craque_domingo_id?: number;
 }
 
 export interface Partida {
