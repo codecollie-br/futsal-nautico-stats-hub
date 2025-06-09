@@ -1,6 +1,6 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { nauticoSupabase } from "@/integrations/supabase/nautico-client";
 import { Jogador, Partida, Domingo, EventoPartida, JogadorPorPartida, TimeEnum, TipoEvento, VotoCraqueDomingo } from "@/types/nautico";
 import { nanoid } from 'nanoid';
 
@@ -10,7 +10,7 @@ export const useJogadores = () => {
     queryKey: ['jogadores'],
     queryFn: async () => {
       console.log("Buscando jogadores...");
-      const { data, error } = await supabase
+      const { data, error } = await nauticoSupabase
         .from('jogadores')
         .select('*')
         .order('nome');
@@ -31,7 +31,7 @@ export const usePartidas = () => {
   return useQuery({
     queryKey: ['partidas'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await nauticoSupabase
         .from('partidas')
         .select(`
           *,
@@ -50,7 +50,7 @@ export const usePartidaAtual = () => {
   return useQuery({
     queryKey: ['partida-atual'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await nauticoSupabase
         .from('partidas')
         .select(`
           *,
@@ -75,7 +75,7 @@ export const useDomingos = () => {
   return useQuery({
     queryKey: ['domingos'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await nauticoSupabase
         .from('domingos')
         .select('*')
         .order('data_domingo', { ascending: false });
@@ -93,7 +93,7 @@ export const useCreateDomingo = () => {
   return useMutation({
     mutationFn: async (data_domingo: string) => {
       const token_moderacao = nanoid(16);
-      const { data, error } = await supabase
+      const { data, error } = await nauticoSupabase
         .from('domingos')
         .insert({ data_domingo, token_moderacao })
         .select()
@@ -114,7 +114,7 @@ export const useCreatePartida = () => {
   
   return useMutation({
     mutationFn: async (domingo_id: number) => {
-      const { data, error } = await supabase
+      const { data, error } = await nauticoSupabase
         .from('partidas')
         .insert({ domingo_id })
         .select()
@@ -136,7 +136,7 @@ export const useIniciarPartida = () => {
   
   return useMutation({
     mutationFn: async (partida_id: number) => {
-      const { data, error } = await supabase
+      const { data, error } = await nauticoSupabase
         .from('partidas')
         .update({ 
           status: 'EM_ANDAMENTO',
@@ -166,7 +166,7 @@ export const useFinalizarPartida = () => {
       duracao_minutos: number; 
       vencedor: string;
     }) => {
-      const { data, error } = await supabase
+      const { data, error } = await nauticoSupabase
         .from('partidas')
         .update({ 
           status: 'FINALIZADA',
@@ -198,7 +198,7 @@ export const useAdicionarJogadorPartida = () => {
       jogador_id: number; 
       time: TimeEnum;
     }) => {
-      const { data, error } = await supabase
+      const { data, error } = await nauticoSupabase
         .from('jogadores_por_partida')
         .insert({ partida_id, jogador_id, time })
         .select()
@@ -219,7 +219,7 @@ export const useRegistrarEvento = () => {
   
   return useMutation({
     mutationFn: async (evento: Partial<EventoPartida>) => {
-      const { data, error } = await supabase
+      const { data, error } = await nauticoSupabase
         .from('eventos_partida')
         .insert(evento)
         .select()
@@ -241,7 +241,7 @@ export const useFilaEspera = (domingo_id?: number) => {
     queryKey: ['fila-espera', domingo_id],
     queryFn: async () => {
       if (!domingo_id) return [];
-      const { data, error } = await supabase
+      const { data, error } = await nauticoSupabase
         .from('fila_espera')
         .select('*, jogador:jogadores(*)')
         .eq('domingo_id', domingo_id)
@@ -257,7 +257,7 @@ export const useAdicionarFilaEspera = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ domingo_id, jogador_id, ordem }: { domingo_id: number, jogador_id: number, ordem: number }) => {
-      const { error } = await supabase
+      const { error } = await nauticoSupabase
         .from('fila_espera')
         .insert({ domingo_id, jogador_id, ordem });
       if (error) throw error;
@@ -274,7 +274,7 @@ export const useAtualizarVitoriasConsecutivas = () => {
   return useMutation({
     mutationFn: async ({ domingo_id, cor, valor }: { domingo_id: number, cor: 'LARANJA' | 'PRETO', valor: number }) => {
       const field = cor === 'LARANJA' ? 'vitorias_laranja_consecutivas' : 'vitorias_preto_consecutivas';
-      const { error } = await supabase
+      const { error } = await nauticoSupabase
         .from('domingos')
         .update({ [field]: valor })
         .eq('id', domingo_id);
@@ -291,7 +291,7 @@ export const useRemoverJogadorPartida = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (jogador_por_partida_id: number) => {
-      const { error } = await supabase
+      const { error } = await nauticoSupabase
         .from('jogadores_por_partida')
         .delete()
         .eq('id', jogador_por_partida_id);
@@ -308,7 +308,7 @@ export const useRemoverFilaEspera = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (fila_espera_id: number) => {
-      const { error } = await supabase
+      const { error } = await nauticoSupabase
         .from('fila_espera')
         .delete()
         .eq('id', fila_espera_id);
@@ -326,7 +326,7 @@ export const useLiberarVotacaoCraque = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (domingo_id: number) => {
-      const { data, error } = await supabase
+      const { data, error } = await nauticoSupabase
         .from('domingos')
         .update({ votacao_liberada: true })
         .eq('id', domingo_id)
@@ -347,7 +347,7 @@ export const useRegistrarVotoCraque = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (voto: { domingo_id: number, votante_jogador_id: number, votado_jogador_id: number }) => {
-      const { data, error } = await supabase
+      const { data, error } = await nauticoSupabase
         .from('votos_craque_domingo')
         .insert(voto)
         .select()
@@ -368,7 +368,7 @@ export const useVotosCraqueDomingo = (domingo_id?: number) => {
     queryKey: ['votos-craque-domingo', domingo_id],
     queryFn: async () => {
       if (!domingo_id) return [];
-      const { data, error } = await supabase
+      const { data, error } = await nauticoSupabase
         .from('votos_craque_domingo')
         .select('*, votante:jogadores!votante_jogador_id(*), votado:jogadores!votado_jogador_id(*)')
         .eq('domingo_id', domingo_id);
@@ -384,7 +384,7 @@ export const useCalcularCraqueDomingo = () => {
   return useMutation({
     mutationFn: async (domingo_id: number) => {
       // 1. Obter todos os votos para o domingo
-      const { data: votos, error: votosError } = await supabase
+      const { data: votos, error: votosError } = await nauticoSupabase
         .from('votos_craque_domingo')
         .select('votado_jogador_id')
         .eq('domingo_id', domingo_id);
@@ -394,7 +394,7 @@ export const useCalcularCraqueDomingo = () => {
       if (!votos || votos.length === 0) {
         // Não há votos para calcular o craque do domingo
         // Opcional: Definir craque_domingo_id como NULL ou deixar como está
-        const { data, error } = await supabase
+        const { data, error } = await nauticoSupabase
           .from('domingos')
           .update({ craque_domingo_id: null })
           .eq('id', domingo_id)
@@ -422,7 +422,7 @@ export const useCalcularCraqueDomingo = () => {
       }
       
       // 4. Atualizar o domingo com o craque eleito
-      const { data, error } = await supabase
+      const { data, error } = await nauticoSupabase
         .from('domingos')
         .update({ craque_domingo_id: craqueId })
         .eq('id', domingo_id)
@@ -445,7 +445,7 @@ export const useDomingoDetalhes = (domingo_id?: number) => {
     queryKey: ['domingo-detalhes', domingo_id],
     queryFn: async () => {
       if (!domingo_id) return null;
-      const { data, error } = await supabase
+      const { data, error } = await nauticoSupabase
         .from('domingos')
         .select(`
           *,

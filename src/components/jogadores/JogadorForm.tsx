@@ -1,8 +1,9 @@
+
 import React, { useState, useRef } from "react";
 import Cropper from "react-easy-crop";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { supabase } from "@/integrations/supabase/client";
+import { nauticoSupabase } from "@/integrations/supabase/nautico-client";
 import { Jogador } from "@/types/nautico";
 
 interface JogadorFormProps {
@@ -78,11 +79,11 @@ const JogadorForm: React.FC<JogadorFormProps> = ({ jogador, onSave }) => {
       if (!image || !croppedAreaPixels) return;
       const croppedImg = await getCroppedImg(image, croppedAreaPixels);
       const fileName = `jogadores/${Date.now()}_${image.name}`;
-      const { data, error } = await supabase.storage
+      const { data, error } = await nauticoSupabase.storage
         .from("fotos-jogadores")
         .upload(fileName, croppedImg, { contentType: "image/jpeg" });
       if (!error) {
-        const { data: publicUrl } = supabase.storage
+        const { data: publicUrl } = nauticoSupabase.storage
           .from("fotos-jogadores")
           .getPublicUrl(fileName);
         setFotoUrl(publicUrl.publicUrl);
@@ -164,4 +165,4 @@ const JogadorForm: React.FC<JogadorFormProps> = ({ jogador, onSave }) => {
   );
 };
 
-export default JogadorForm; 
+export default JogadorForm;

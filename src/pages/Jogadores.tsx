@@ -10,7 +10,7 @@ import JogadorCard from "@/components/jogadores/JogadorCard";
 import JogadorForm from "@/components/jogadores/JogadorForm";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { nauticoSupabase } from "@/integrations/supabase/nautico-client";
 import { toast } from "@/components/ui/use-toast";
 
 const Jogadores = () => {
@@ -46,11 +46,11 @@ const Jogadores = () => {
       console.log("Salvando jogador:", payload);
       if (payload.id) {
         // Editar
-        const { error } = await supabase.from('jogadores').update(payload).eq('id', payload.id);
+        const { error } = await nauticoSupabase.from('jogadores').update(payload).eq('id', payload.id);
         if (error) throw error;
       } else {
         // Criar
-        const { error } = await supabase.from('jogadores').insert(payload);
+        const { error } = await nauticoSupabase.from('jogadores').insert(payload);
         if (error) throw error;
       }
     },
