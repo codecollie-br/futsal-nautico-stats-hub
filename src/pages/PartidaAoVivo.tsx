@@ -605,13 +605,13 @@ const PartidaAoVivo = () => {
         </div>
       )}
 
-      <Dialog open={!!modalGolOpen} onOpenChange={setModalGolOpen}>
+      <Dialog open={!!modalGolOpen} onOpenChange={(open) => setModalGolOpen(open ? modalGolOpen : false)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Registrar Gol {modalGolOpen === 'LARANJA' ? 'Laranja' : 'Preto'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <Checkbox checked={golContra} onCheckedChange={setGolContra} id="gol-contra" />
+            <Checkbox checked={golContra} onCheckedChange={(checked) => setGolContra(checked === true)} id="gol-contra" />
             <label htmlFor="gol-contra" className="ml-2">Gol Contra</label>
             {!golContra && (
               <>
@@ -676,7 +676,7 @@ const PartidaAoVivo = () => {
               {timesSorteados.laranja.map(j => (
                 <div key={j.jogador_id} className="flex items-center gap-2 mb-1">
                   <span>{j.jogador?.nome}</span>
-                  <Button size="xs" variant="outline" onClick={() => removerDoTime(j, 'laranja')}>Remover</Button>
+                  <Button size="sm" variant="outline" onClick={() => removerDoTime(j, 'laranja')}>Remover</Button>
                 </div>
               ))}
               <Button size="sm" variant="ghost" onClick={() => {}} disabled>Adicionar</Button>
@@ -686,7 +686,7 @@ const PartidaAoVivo = () => {
               {timesSorteados.preto.map(j => (
                 <div key={j.jogador_id} className="flex items-center gap-2 mb-1">
                   <span>{j.jogador?.nome}</span>
-                  <Button size="xs" variant="outline" onClick={() => removerDoTime(j, 'preto')}>Remover</Button>
+                  <Button size="sm" variant="outline" onClick={() => removerDoTime(j, 'preto')}>Remover</Button>
                 </div>
               ))}
               <Button size="sm" variant="ghost" onClick={() => {}} disabled>Adicionar</Button>
@@ -696,7 +696,7 @@ const PartidaAoVivo = () => {
               {filaRestante.map(j => (
                 <div key={j.jogador_id} className="flex items-center gap-2 mb-1">
                   <span>{j.jogador?.nome}</span>
-                  <Button size="xs" variant="outline" onClick={() => moverParaTime(j, timesSorteados.laranja.length < 5 ? 'laranja' : 'preto')}>Colocar em {timesSorteados.laranja.length < 5 ? 'Laranja' : 'Preto'}</Button>
+                  <Button size="sm" variant="outline" onClick={() => moverParaTime(j, timesSorteados.laranja.length < 5 ? 'laranja' : 'preto')}>Colocar em {timesSorteados.laranja.length < 5 ? 'Laranja' : 'Preto'}</Button>
                 </div>
               ))}
             </div>

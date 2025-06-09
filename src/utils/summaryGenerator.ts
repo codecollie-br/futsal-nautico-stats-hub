@@ -1,3 +1,4 @@
+
 import { Domingo, Jogador } from "@/types/nautico";
 import { calculateCraqueCandidates, calculateTeamOfTheDay } from "./craqueCalculations";
 import { aggregatePlayerStats } from "./craqueCalculations"; // Importar a função auxiliar
@@ -7,8 +8,8 @@ export const generateWhatsAppSummary = (domingoDetalhes: Domingo, allJogadores: 
     return "Não há dados de partidas finalizadas para este domingo.";
   }
 
-  const { domingo, partidas } = domingoDetalhes;
-  const dataDomingo = new Date(domingo.data_domingo!).toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  const { partidas } = domingoDetalhes;
+  const dataDomingo = new Date(domingoDetalhes.data_domingo!).toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
   let summary = `*⚽ Resumo do Domingo Futsal - ${dataDomingo} ⚽*
 

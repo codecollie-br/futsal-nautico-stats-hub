@@ -1,3 +1,4 @@
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { usePartidas, useDomingoDetalhes, useJogadores, useRegistrarVotoCraque, useVotosCraqueDomingo, useCalcularCraqueDomingo, useLiberarVotacaoCraque } from "@/hooks/useNautico";
 import { Calendar, Trophy, Star } from "lucide-react";
@@ -62,6 +63,61 @@ const Historico = () => {
 
   const uniqueDomingoIds = Object.keys(partidasByDomingo).map(Number);
 
+  const handleOpenVotoModal = (dId: number) => {
+    setCurrentDomingoId(dId);
+    setVotanteId(null);
+    setVotadoId(null);
+    setErroVoto(null);
+    setModalVotoOpen(true);
+  };
+
+  const handleRegistrarVoto = async () => {
+    if (!currentDomingoId || !votanteId || !votadoId) {
+      setErroVoto("Selecione o votante e o jogador votado.");
+      return;
+    }
+    
+    try {
+      await registrarVoto.mutateAsync({
+        domingo_id: currentDomingoId,
+        votante_jogador_id: votanteId,
+        votado_jogador_id: votadoId,
+      });
+      toast({ title: "Voto registrado com sucesso!" });
+      setModalVotoOpen(false);
+    } catch (error: any) {
+      setErroVoto(error.message || "Erro ao registrar voto.");
+    }
+  };
+
+  const handleCalcularCraque = async (dId: number) => {
+    try {
+      await calcularCraque.mutateAsync(dId);
+      toast({ title: "Craque do domingo calculado!" });
+    } catch (error: any) {
+      toast({ title: "Erro ao calcular craque.", description: error.message, variant: "destructive" });
+    }
+  };
+
+  const handleLiberarVotacao = async (dId: number) => {
+    try {
+      await liberarVotacao.mutateAsync(dId);
+      toast({ title: "Votação liberada!" });
+    } catch (error: any) {
+      toast({ title: "Erro ao liberar votação.", description: error.message, variant: "destructive" });
+    }
+  };
+
+  const handleCopySummary = (domingoDetalhes: Domingo) => {
+    if (domingoDetalhes && jogadores) {
+      const summaryText = generateWhatsAppSummary(domingoDetalhes, jogadores);
+      navigator.clipboard.writeText(summaryText);
+      toast({ title: "Resumo copiado para o WhatsApp!" });
+    } else {
+      toast({ title: "Erro ao gerar resumo", description: "Dados do domingo ou jogadores não disponíveis.", variant: "destructive" });
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -109,68 +165,6 @@ const Historico = () => {
             // Use useDomingoDetalhes for detailed domingo data
             const { data: domingoDetalhes, isLoading: isLoadingDomingoDetalhes } = useDomingoDetalhes(domingoId);
             const { data: votosDoDomingo, refetch: refetchVotos } = useVotosCraqueDomingo(domingoId);
-
-            const handleOpenVotoModal = (dId: number) => {
-              setCurrentDomingoId(dId);
-              setVotanteId(null);
-              setVotadoId(null);
-              setErroVoto(null);
-              setModalVotoOpen(true);
-            };
-
-            const handleRegistrarVoto = async () => {
-              if (!currentDomingoId || !votanteId || !votadoId) {
-                setErroVoto("Selecione o votante e o jogador votado.");
-                return;
-              }
-              // Check if votante has already voted for this domingo
-              const hasVoted = votosDoDomingo?.some(v => v.votante_jogador_id === votanteId);
-              if (hasVoted) {
-                setErroVoto("Você já votou neste domingo.");
-                return;
-              }
-
-              try {
-                await registrarVoto.mutateAsync({
-                  domingo_id: currentDomingoId,
-                  votante_jogador_id: votanteId,
-                  votado_jogador_id: votadoId,
-                });
-                toast({ title: "Voto registrado com sucesso!" });
-                setModalVotoOpen(false);
-                refetchVotos(); // Re-fetch votes to update UI
-              } catch (error: any) {
-                setErroVoto(error.message || "Erro ao registrar voto.");
-              }
-            };
-
-            const handleCalcularCraque = async (dId: number) => {
-              try {
-                await calcularCraque.mutateAsync(dId);
-                toast({ title: "Craque do domingo calculado!" });
-              } catch (error: any) {
-                toast({ title: "Erro ao calcular craque.", description: error.message, variant: "destructive" });
-              }
-            };
-
-            const handleLiberarVotacao = async (dId: number) => {
-              try {
-                await liberarVotacao.mutateAsync(dId);
-                toast({ title: "Votação liberada!" });
-              } catch (error: any) {
-                toast({ title: "Erro ao liberar votação.", description: error.message, variant: "destructive" });
-              }
-            };
-
-            const handleCopySummary = () => {
-              if (domingoDetalhes && jogadores) {
-                const summaryText = generateWhatsAppSummary(domingoDetalhes, jogadores);
-                navigator.clipboard.writeText(summaryText);
-                toast({ title: "Resumo copiado para o WhatsApp!" });
-              } else {
-                toast({ title: "Erro ao gerar resumo", description: "Dados do domingo ou jogadores não disponíveis.", variant: "destructive" });
-              }
-            };
 
             // Calcula os candidatos a craque se os detalhes do domingo estiverem carregados
             const craqueCandidates = domingoDetalhes ? calculateCraqueCandidates(domingoDetalhes) : [];
@@ -320,7 +314,7 @@ const Historico = () => {
                       {/* Botão Copiar Resumo para WhatsApp */}
                       {domingoDetalhes?.craque_domingo_id && (
                         <div className="mt-6 border-t pt-4 text-center">
-                          <Button onClick={handleCopySummary} className="w-full md:w-auto">
+                          <Button onClick={() => handleCopySummary(domingoDetalhes)} className="w-full md:w-auto">
                             Copiar Resumo para WhatsApp
                           </Button>
                         </div>
@@ -362,7 +356,7 @@ const Historico = () => {
               <label className="block mb-1">Jogador Votado (Craque)</label>
               <Select value={votadoId?.toString() || ''} onValueChange={v => setVotadoId(Number(v))}>
                 <option value="">Selecione o craque</option>
-                {currentDomingoId && domingoDetalhes && calculateCraqueCandidates(domingoDetalhes).map(candidate => (
+                {currentDomingoId && craqueCandidates.map(candidate => (
                   <option key={candidate.jogador.id} value={candidate.jogador.id}>{candidate.jogador.nome}</option>
                 ))}
               </Select>
