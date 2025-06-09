@@ -5,7 +5,7 @@ import { Calendar, Trophy, Star } from "lucide-react";
 import PlacarPartida from "@/components/partida/PlacarPartida";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Select } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { calculateCraqueCandidates, calculateTeamOfTheDay } from "@/utils/craqueCalculations";
@@ -26,19 +26,15 @@ const Historico = () => {
   const [erroVoto, setErroVoto] = useState<string | null>(null);
 
   // Hooks for data
-  const { data: jogadores } = useJogadores(); // All players for votante selection
+  const { data: jogadores } = useJogadores();
 
   // Mutations for voting
   const registrarVoto = useRegistrarVotoCraque();
   const calcularCraque = useCalcularCraqueDomingo();
   const liberarVotacao = useLiberarVotacaoCraque();
 
-  // Helper to check if current user is moderator (simplified for now, ideally passed down or checked globally)
-  // For demonstration, let's assume if there's a token_moderacao in the URL, it's a moderator.
-  // In a real app, this would be a more robust auth check.
+  // Helper to check if current user is moderator
   const location = window.location;
-  // Nota: A lógica de moderador idealmente viria de um contexto de autenticação robusto.
-  // Por ora, um placeholder para simular.
   const isModerador = new URLSearchParams(location.search).get("token") === "MODERATOR_TOKEN_HERE"; 
 
   if (isLoading) {
@@ -159,19 +155,15 @@ const Historico = () => {
           uniqueDomingoIds.sort((a, b) => {
             const dateA = new Date(partidasByDomingo[a].domingo.data_domingo!).getTime();
             const dateB = new Date(partidasByDomingo[b].domingo.data_domingo!).getTime();
-            return dateB - dateA; // Sort by most recent domingo
+            return dateB - dateA;
           }).map(domingoId => {
             const domingoData = partidasByDomingo[domingoId].domingo;
-            // Use useDomingoDetalhes for detailed domingo data
             const { data: domingoDetalhes, isLoading: isLoadingDomingoDetalhes } = useDomingoDetalhes(domingoId);
-            const { data: votosDoDomingo, refetch: refetchVotos } = useVotosCraqueDomingo(domingoId);
+            const { data: votosDoDomingo } = useVotosCraqueDomingo(domingoId);
 
             // Calcula os candidatos a craque se os detalhes do domingo estiverem carregados
             const craqueCandidates = domingoDetalhes ? calculateCraqueCandidates(domingoDetalhes) : [];
-            // Encontra o nome do craque do domingo se ele já foi eleito
             const craqueDomingo = domingoDetalhes?.craque_domingo_id ? jogadores?.find(j => j.id === domingoDetalhes.craque_domingo_id) : null;
-
-            // Calcula o Time do Domingo se os detalhes do domingo estiverem carregados e tiver um craque eleito (indicando fim do dia)
             const teamOfTheDay = domingoDetalhes && domingoDetalhes.craque_domingo_id ? calculateTeamOfTheDay(domingoDetalhes) : [];
 
             return (
@@ -276,7 +268,7 @@ const Historico = () => {
                         )}
                       </div>
                       
-                      {/* Time do Domingo */}
+                      {/* Team do Domingo */}
                       {domingoDetalhes?.craque_domingo_id && teamOfTheDay.length > 0 && (
                         <div className="mt-6 border-t pt-4">
                           <h3 className="text-xl font-semibold mb-3 flex items-center gap-2">
@@ -292,18 +284,18 @@ const Historico = () => {
                                 style={{
                                   left: player.x + 'px',
                                   top: player.y + 'px',
-                                  transform: 'translate(-50%, -50%)', // Centraliza o jogador no ponto
+                                  transform: 'translate(-50%, -50%)',
                                   width: '40px',
                                   height: '40px',
                                 }}
                               >
                                 <img 
-                                  src={player.jogador.foto_url || 'https://via.placeholder.com/40'} // Placeholder if no foto_url
+                                  src={player.jogador.foto_url || 'https://via.placeholder.com/40'}
                                   alt={player.jogador.nome}
                                   className="w-full h-full rounded-full object-cover border-2 border-white shadow-md"
                                 />
                                 <span className="text-[10px] font-semibold text-gray-800 mt-1 text-center whitespace-nowrap overflow-hidden text-ellipsis w-max max-w-[60px]">
-                                  {player.jogador.nome.split(' ')[0]} {/* Show only first name */}
+                                  {player.jogador.nome.split(' ')[0]}
                                 </span>
                               </div>
                             ))}
@@ -346,19 +338,27 @@ const Historico = () => {
             <div>
               <label className="block mb-1">Seu Nome (Votante)</label>
               <Select value={votanteId?.toString() || ''} onValueChange={v => setVotanteId(Number(v))}>
-                <option value="">Selecione seu nome</option>
-                {jogadores?.map(j => (
-                  <option key={j.id} value={j.id}>{j.nome}</option>
-                ))}
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione seu nome" />
+                </SelectTrigger>
+                <SelectContent>
+                  {jogadores?.map(j => (
+                    <SelectItem key={j.id} value={j.id.toString()}>{j.nome}</SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
             </div>
             <div>
               <label className="block mb-1">Jogador Votado (Craque)</label>
               <Select value={votadoId?.toString() || ''} onValueChange={v => setVotadoId(Number(v))}>
-                <option value="">Selecione o craque</option>
-                {currentDomingoId && craqueCandidates.map(candidate => (
-                  <option key={candidate.jogador.id} value={candidate.jogador.id}>{candidate.jogador.nome}</option>
-                ))}
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o craque" />
+                </SelectTrigger>
+                <SelectContent>
+                  {currentDomingoId && craqueCandidates.map(candidate => (
+                    <SelectItem key={candidate.jogador.id} value={candidate.jogador.id.toString()}>{candidate.jogador.nome}</SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
             </div>
             {erroVoto && <div className="text-red-600 text-sm">{erroVoto}</div>}
