@@ -1,3 +1,4 @@
+
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Jogador, Partida, Domingo, EventoPartida, JogadorPorPartida, TimeEnum, TipoEvento, VotoCraqueDomingo } from "@/types/nautico";
@@ -8,12 +9,18 @@ export const useJogadores = () => {
   return useQuery({
     queryKey: ['jogadores'],
     queryFn: async () => {
+      console.log("Buscando jogadores...");
       const { data, error } = await supabase
-        .from('jogadores', { schema: 'nautico' })
+        .from('jogadores')
         .select('*')
         .order('nome');
       
-      if (error) throw error;
+      console.log("Resultado da busca:", { data, error });
+      
+      if (error) {
+        console.error("Erro ao buscar jogadores:", error);
+        throw error;
+      }
       return data as Jogador[];
     }
   });
@@ -192,7 +199,7 @@ export const useAdicionarJogadorPartida = () => {
       time: TimeEnum;
     }) => {
       const { data, error } = await supabase
-        .from('jogadores_por_partida', { schema: 'nautico' })
+        .from('jogadores_por_partida')
         .insert({ partida_id, jogador_id, time })
         .select()
         .single();

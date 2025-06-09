@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -13,12 +14,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
 
 const Jogadores = () => {
-  const { data: jogadores, isLoading } = useJogadores();
+  const { data: jogadores, isLoading, error } = useJogadores();
   const [filtro, setFiltro] = useState("");
   const [filtroTipo, setFiltroTipo] = useState<'todos' | 'goleiros' | 'jogadores'>('todos');
   const [modalOpen, setModalOpen] = useState(false);
   const [editJogador, setEditJogador] = useState<any>(null);
   const queryClient = useQueryClient();
+
+  console.log("Estado da página Jogadores:", { jogadores, isLoading, error });
 
   const jogadoresFiltrados = jogadores?.filter(jogador => {
     const nomeMatch = jogador.nome.toLowerCase().includes(filtro.toLowerCase()) ||
@@ -40,13 +43,14 @@ const Jogadores = () => {
   // Mutation para criar/editar jogador
   const mutation = useMutation({
     mutationFn: async (payload: any) => {
+      console.log("Salvando jogador:", payload);
       if (payload.id) {
         // Editar
-        const { error } = await supabase.from('jogadores', { schema: 'nautico' }).update(payload).eq('id', payload.id);
+        const { error } = await supabase.from('jogadores').update(payload).eq('id', payload.id);
         if (error) throw error;
       } else {
         // Criar
-        const { error } = await supabase.from('jogadores', { schema: 'nautico' }).insert(payload);
+        const { error } = await supabase.from('jogadores').insert(payload);
         if (error) throw error;
       }
     },
@@ -57,6 +61,7 @@ const Jogadores = () => {
       queryClient.invalidateQueries({ queryKey: ['jogadores'] });
     },
     onError: (err: any) => {
+      console.error("Erro ao salvar jogador:", err);
       toast({ title: 'Erro', description: err.message || 'Erro ao salvar jogador', variant: 'destructive' });
     }
   });
@@ -81,6 +86,17 @@ const Jogadores = () => {
     return (
       <div className="text-center py-8">
         <div>Carregando jogadores...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-8">
+        <div className="text-red-500">Erro ao carregar jogadores: {error.message}</div>
+        <Button onClick={() => window.location.reload()} className="mt-4">
+          Tentar novamente
+        </Button>
       </div>
     );
   }
