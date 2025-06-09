@@ -1,3 +1,4 @@
+
 export type TimeEnum = 'LARANJA' | 'PRETO';
 export type ResultadoEnum = 'LARANJA' | 'PRETO' | 'EMPATE';
 export type TipoEvento = 'GOL' | 'SUBSTITUICAO';
@@ -26,6 +27,7 @@ export interface Domingo {
   vitorias_preto_consecutivas?: number;
   votacao_liberada?: boolean;
   craque_domingo_id?: number;
+  partidas?: Partida[];
 }
 
 export interface Partida {
@@ -40,6 +42,8 @@ export interface Partida {
   status: StatusPartida;
   created_at: string;
   domingo?: Domingo;
+  jogadores_por_partida?: JogadorPorPartida[];
+  eventos_partida?: EventoPartida[];
 }
 
 export interface JogadorPorPartida {
@@ -71,6 +75,8 @@ export interface VotoCraqueDomingo {
   votante_jogador_id: number;
   votado_jogador_id: number;
   created_at: string;
+  votante?: Jogador;
+  votado?: Jogador;
 }
 
 export interface Configuracao {

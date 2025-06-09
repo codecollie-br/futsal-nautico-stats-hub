@@ -280,7 +280,7 @@ export const useAtualizarVitoriasConsecutivas = () => {
         .eq('id', domingo_id);
       if (error) throw error;
     },
-    onSuccess: (_data, variables) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['domingos'] });
     }
   });
@@ -314,7 +314,7 @@ export const useRemoverFilaEspera = () => {
         .eq('id', fila_espera_id);
       if (error) throw error;
     },
-    onSuccess: (_data, variables) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['fila-espera'] });
       queryClient.invalidateQueries({ queryKey: ['partida-atual'] }); // Para atualizar a lista de aptos
     }
@@ -335,7 +335,7 @@ export const useLiberarVotacaoCraque = () => {
       if (error) throw error;
       return data;
     },
-    onSuccess: (_data, variables) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['domingos'] });
       queryClient.invalidateQueries({ queryKey: ['partida-atual'] }); // Se a partida atual for a do domingo em questão
     }
@@ -434,7 +434,7 @@ export const useCalcularCraqueDomingo = () => {
     },
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['domingos'] });
-      queryClient.invalidateQueries({ queryKey: ['votos-craque-domingo', variables.domingo_id] });
+      queryClient.invalidateQueries({ queryKey: ['votos-craque-domingo', variables] });
     }
   });
 };
