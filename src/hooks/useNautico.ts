@@ -11,7 +11,6 @@ export const useJogadores = () => {
     queryFn: async () => {
       console.log("Buscando jogadores...");
       const { data, error } = await supabase
-        .schema('nautico')
         .from('jogadores')
         .select('*')
         .order('nome');
@@ -33,7 +32,6 @@ export const usePartidas = () => {
     queryKey: ['partidas'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .schema('nautico')
         .from('partidas')
         .select(`
           *,
@@ -53,7 +51,6 @@ export const usePartidaAtual = () => {
     queryKey: ['partida-atual'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .schema('nautico')
         .from('partidas')
         .select(`
           *,
@@ -79,7 +76,6 @@ export const useDomingos = () => {
     queryKey: ['domingos'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .schema('nautico')
         .from('domingos')
         .select('*')
         .order('data_domingo', { ascending: false });
@@ -98,7 +94,6 @@ export const useCreateDomingo = () => {
     mutationFn: async (data_domingo: string) => {
       const token_moderacao = nanoid(16);
       const { data, error } = await supabase
-        .schema('nautico')
         .from('domingos')
         .insert({ data_domingo, token_moderacao })
         .select()
@@ -120,7 +115,6 @@ export const useCreatePartida = () => {
   return useMutation({
     mutationFn: async (domingo_id: number) => {
       const { data, error } = await supabase
-        .schema('nautico')
         .from('partidas')
         .insert({ domingo_id })
         .select()
@@ -143,7 +137,6 @@ export const useIniciarPartida = () => {
   return useMutation({
     mutationFn: async (partida_id: number) => {
       const { data, error } = await supabase
-        .schema('nautico')
         .from('partidas')
         .update({ 
           status: 'EM_ANDAMENTO',
@@ -174,7 +167,6 @@ export const useFinalizarPartida = () => {
       vencedor: string;
     }) => {
       const { data, error } = await supabase
-        .schema('nautico')
         .from('partidas')
         .update({ 
           status: 'FINALIZADA',
@@ -207,7 +199,6 @@ export const useAdicionarJogadorPartida = () => {
       time: TimeEnum;
     }) => {
       const { data, error } = await supabase
-        .schema('nautico')
         .from('jogadores_por_partida')
         .insert({ partida_id, jogador_id, time })
         .select()
@@ -229,7 +220,6 @@ export const useRegistrarEvento = () => {
   return useMutation({
     mutationFn: async (evento: Partial<EventoPartida>) => {
       const { data, error } = await supabase
-        .schema('nautico')
         .from('eventos_partida')
         .insert(evento)
         .select()
@@ -252,7 +242,6 @@ export const useFilaEspera = (domingo_id?: number) => {
     queryFn: async () => {
       if (!domingo_id) return [];
       const { data, error } = await supabase
-        .schema('nautico')
         .from('fila_espera')
         .select('*, jogador:jogadores(*)')
         .eq('domingo_id', domingo_id)
@@ -269,7 +258,6 @@ export const useAdicionarFilaEspera = () => {
   return useMutation({
     mutationFn: async ({ domingo_id, jogador_id, ordem }: { domingo_id: number, jogador_id: number, ordem: number }) => {
       const { error } = await supabase
-        .schema('nautico')
         .from('fila_espera')
         .insert({ domingo_id, jogador_id, ordem });
       if (error) throw error;
@@ -287,7 +275,6 @@ export const useAtualizarVitoriasConsecutivas = () => {
     mutationFn: async ({ domingo_id, cor, valor }: { domingo_id: number, cor: 'LARANJA' | 'PRETO', valor: number }) => {
       const field = cor === 'LARANJA' ? 'vitorias_laranja_consecutivas' : 'vitorias_preto_consecutivas';
       const { error } = await supabase
-        .schema('nautico')
         .from('domingos')
         .update({ [field]: valor })
         .eq('id', domingo_id);
@@ -305,7 +292,6 @@ export const useRemoverJogadorPartida = () => {
   return useMutation({
     mutationFn: async (jogador_por_partida_id: number) => {
       const { error } = await supabase
-        .schema('nautico')
         .from('jogadores_por_partida')
         .delete()
         .eq('id', jogador_por_partida_id);
@@ -323,7 +309,6 @@ export const useRemoverFilaEspera = () => {
   return useMutation({
     mutationFn: async (fila_espera_id: number) => {
       const { error } = await supabase
-        .schema('nautico')
         .from('fila_espera')
         .delete()
         .eq('id', fila_espera_id);
@@ -342,7 +327,6 @@ export const useLiberarVotacaoCraque = () => {
   return useMutation({
     mutationFn: async (domingo_id: number) => {
       const { data, error } = await supabase
-        .schema('nautico')
         .from('domingos')
         .update({ votacao_liberada: true })
         .eq('id', domingo_id)
@@ -364,7 +348,6 @@ export const useRegistrarVotoCraque = () => {
   return useMutation({
     mutationFn: async (voto: { domingo_id: number, votante_jogador_id: number, votado_jogador_id: number }) => {
       const { data, error } = await supabase
-        .schema('nautico')
         .from('votos_craque_domingo')
         .insert(voto)
         .select()
@@ -386,7 +369,6 @@ export const useVotosCraqueDomingo = (domingo_id?: number) => {
     queryFn: async () => {
       if (!domingo_id) return [];
       const { data, error } = await supabase
-        .schema('nautico')
         .from('votos_craque_domingo')
         .select('*, votante:jogadores!votante_jogador_id(*), votado:jogadores!votado_jogador_id(*)')
         .eq('domingo_id', domingo_id);
@@ -403,7 +385,6 @@ export const useCalcularCraqueDomingo = () => {
     mutationFn: async (domingo_id: number) => {
       // 1. Obter todos os votos para o domingo
       const { data: votos, error: votosError } = await supabase
-        .schema('nautico')
         .from('votos_craque_domingo')
         .select('votado_jogador_id')
         .eq('domingo_id', domingo_id);
@@ -414,7 +395,6 @@ export const useCalcularCraqueDomingo = () => {
         // Não há votos para calcular o craque do domingo
         // Opcional: Definir craque_domingo_id como NULL ou deixar como está
         const { data, error } = await supabase
-          .schema('nautico')
           .from('domingos')
           .update({ craque_domingo_id: null })
           .eq('id', domingo_id)
@@ -443,7 +423,6 @@ export const useCalcularCraqueDomingo = () => {
       
       // 4. Atualizar o domingo com o craque eleito
       const { data, error } = await supabase
-        .schema('nautico')
         .from('domingos')
         .update({ craque_domingo_id: craqueId })
         .eq('id', domingo_id)
@@ -467,7 +446,6 @@ export const useDomingoDetalhes = (domingo_id?: number) => {
     queryFn: async () => {
       if (!domingo_id) return null;
       const { data, error } = await supabase
-        .schema('nautico')
         .from('domingos')
         .select(`
           *,
