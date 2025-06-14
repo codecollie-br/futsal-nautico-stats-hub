@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { usePartidas, useDomingoDetalhes, useJogadores, useRegistrarVotoCraque, useVotosCraqueDomingo, useCalcularCraqueDomingo, useLiberarVotacaoCraque } from "@/hooks/useNautico";
 import { Calendar, Trophy, Star } from "lucide-react";
@@ -355,8 +354,8 @@ const Historico = () => {
                   <SelectValue placeholder="Selecione o craque" />
                 </SelectTrigger>
                 <SelectContent>
-                  {currentDomingoId && craqueCandidates.map(candidate => (
-                    <SelectItem key={candidate.jogador.id} value={candidate.jogador.id.toString()}>{candidate.jogador.nome}</SelectItem>
+                  {currentDomingoId && jogadores?.map(jogador => (
+                    <SelectItem key={jogador.id} value={jogador.id.toString()}>{jogador.nome}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
