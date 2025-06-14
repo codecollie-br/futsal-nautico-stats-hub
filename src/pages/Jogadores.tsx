@@ -46,11 +46,11 @@ const Jogadores = () => {
       console.log("Salvando jogador:", payload);
       if (payload.id) {
         // Editar
-        const { error } = await nauticoSupabase.from('jogadores').update(payload).eq('id', payload.id);
+        const { error } = await nauticoSupabase.schema('nautico').from('jogadores').update(payload).eq('id', payload.id);
         if (error) throw error;
       } else {
         // Criar
-        const { error } = await nauticoSupabase.from('jogadores').insert(payload);
+        const { error } = await nauticoSupabase.schema('nautico').from('jogadores').insert(payload);
         if (error) throw error;
       }
     },
